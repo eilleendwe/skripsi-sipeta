@@ -1,4 +1,4 @@
-# SIPETA: Sistem Pemantauan Tutupan Lahan Terbangun
+# <img src="ui/logo.svg" alt="Logo SIPETA" width="36" align="absmiddle"> SIPETA: Sistem Pemantauan Tutupan Lahan Terbangun
 
 SIPETA adalah web untuk memantau perubahan dan memprediksi tutupan lahan terbangun di Kota Tangerang, Kota Tangerang Selatan, dan Kabupaten Tangerang pada tingkat kecamatan, berbasis citra satelit Sentinel-2 Level-2A.
 

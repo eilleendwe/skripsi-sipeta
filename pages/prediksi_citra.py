@@ -42,26 +42,22 @@ def _hasil(hasil: dict) -> None:
     sel_h, sel_w = hasil["ukuran_sel_m"]
     acuan, tahun = hasil["tahun_acuan"], hasil["tahun"]
     keterangan = f"{lebar} × {tinggi} piksel · 1 piksel = {fmt.angka(hasil['resolusi_m'], 0)} m"
-    c_aktual, c_pred, c_info = st.columns([1, 1, 0.9], gap="medium")
-
-    with c_aktual:
-        layout.section(f"Aktual {acuan} (peta tahunan)")
-        with st.container(key="kanvas_pc_aktual"):
+    with st.container(key="kanvas_pc"):
+        c_aktual, c_pred, c_ubah = st.columns(3, gap="medium")
+        with c_aktual:
+            layout.section(f"Aktual {acuan} (peta tahunan)")
             st.image(hasil["citra_aktual"], width="stretch", caption=keterangan)
+        with c_pred:
+            layout.section(f"Prediksi {tahun} (ConvLSTM)")
+            st.image(hasil["citra_prediksi"], width="stretch", caption=keterangan)
+        with c_ubah:
+            layout.section(f"Perubahan {acuan} → {tahun}")
+            st.image(hasil["citra_perubahan"], width="stretch", caption=keterangan)
+    layout.legend(predict.LEGENDA + predict.LEGENDA_PERUBAHAN)
 
-    with c_pred:
-        perubahan = st.session_state.get("pc_perubahan", False)
-        layout.section(f"Perubahan {acuan} → {tahun}" if perubahan else f"Prediksi {tahun} (ConvLSTM)")
-        kanvas = st.container(key="kanvas_pc_prediksi")
-        st.toggle("Tampilkan perubahan", key="pc_perubahan",
-                  help=f"Piksel yang bertambah atau berkurang dibanding peta aktual {acuan}.")
-        if perubahan:
-            kanvas.image(hasil["citra_perubahan"], width="stretch", caption=keterangan)
-            layout.legend(predict.LEGENDA_PERUBAHAN)
-        else:
-            kanvas.image(hasil["citra_prediksi"], width="stretch", caption=keterangan)
-
-    with c_info:
+    st.divider()
+    c_fakta, c_luas = st.columns([1, 1.2], gap="medium")
+    with c_fakta:
         masukan = f"peta tahunan {hasil['masukan'][0]}–{hasil['masukan'][-1]}"
         if hasil["rekursif"]:
             masukan += f", lalu prediksi {acuan + 1}"
@@ -74,6 +70,8 @@ def _hasil(hasil: dict) -> None:
         ])
         if hasil["rekursif"]:
             badges.pill(_LENCANA_REKURSIF, "amber")
+        hasil_ui.save_download("pc", hasil, predict, "Hasil prediksi disimpan.")
+    with c_luas:
         layout.metric_cards([
             ("Luas Lahan Terbangun", fmt.km2(hasil["luas_terbangun"])),
             ("Luas Lahan Nonterbangun", fmt.km2(hasil["luas_nonterbangun"])),
@@ -89,9 +87,7 @@ def _hasil(hasil: dict) -> None:
             ("Luas versi 64×64", f"{acuan}: {fmt.km2(hasil['luas_acuan_64'])} · "
                                  f"{tahun}: {fmt.km2(hasil['luas_terbangun_64'])}"),
         ])
-        hasil_ui.save_download("pc", hasil, predict, "Hasil prediksi disimpan.")
 
-    layout.legend(predict.LEGENDA)
     st.caption(
         f"ConvLSTM bekerja pada peta 64×64 (1 sel ≈ {sel_h} × {sel_w} m untuk kecamatan ini). Peta 10 m disusun "
         f"dari peta aktual {acuan}: sel yang menurut model berubah diganti seluruhnya, sel lain tetap memakai detail "
