@@ -1,6 +1,5 @@
 """
 Pemantauan: membandingkan hasil klasifikasi tersimpan antar tanggal.
-
 Membaca hasil dari klasifkasi citra `services.classify.save'.
 """
 

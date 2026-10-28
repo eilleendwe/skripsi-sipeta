@@ -144,9 +144,7 @@ def coverage_label(model: dict) -> str:
 
 def scan_folder(nama_berkas: list[str], kecamatan_id: str | None) -> dict:
     """
-    Cek struktur folder citra latih dari nama berkasnya saja. Isi berkas (grid, CRS) dicek
-    core.latih saat pelatihan dimulai.
-
+    Cek struktur folder citra latih dari nama file.
     Struktur yang diharapkan: <kecamatan>/<YYYY-MM-DD>/<...>_B02_10m.tif (9 band + SCL).
     """
     akar, per_tanggal, diabaikan = set(), {}, []
