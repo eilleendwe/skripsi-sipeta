@@ -123,6 +123,14 @@
   min-width: 268px;
   max-width: 268px;
 }
+/*
+  Habis logout sidebar ikut hilang.
+*/
+[data-testid="stSidebar"]:not(:has([data-testid="stElementContainer"])),
+body:not(:has([data-testid="stSidebar"] [data-testid="stElementContainer"]))
+  [data-testid="stExpandSidebarButton"] {
+  display: none;
+}
 [data-testid="stSidebarHeader"] {
   height: 1.5rem;
   min-height: 1.5rem;
