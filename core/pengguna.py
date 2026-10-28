@@ -28,14 +28,14 @@ def sandi_cocok(sandi: str, tersimpan: str) -> bool:
 
 def daftar(nama: str, email: str, password: str) -> dict:
     """
-    Akun baru selalu berperan Pengguna. Isian form sudah dicek di services.auth.
+    Akun baru langsung berperan Admin. Isian form sudah dicek di services.auth.
     """
     if len(nama.strip()) > 100:
         raise ProsesError("Periksa kembali isian form.", {"nama": "Nama maksimal 100 karakter."})
     if len(email.strip()) > 150:
         raise ProsesError("Periksa kembali isian form.", {"email": "Email maksimal 150 karakter."})
     row = db.fetch_one(
-        "INSERT INTO pengguna (nama, email, password_hash) VALUES (%s, %s, %s) "
+        "INSERT INTO pengguna (nama, email, password_hash, peran) VALUES (%s, %s, %s, 'admin') "
         "ON CONFLICT (email) DO NOTHING RETURNING id",
         (nama.strip(), email.strip().lower(), hash_sandi(password)),
     )

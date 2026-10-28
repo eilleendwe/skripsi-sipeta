@@ -71,7 +71,7 @@ def logout() -> None:
 
 def register(nama: str, email: str, password: str, konfirmasi: str) -> dict:
     """
-    Buat akun baru. Perannya selalu Pengguna.
+    Buat akun baru. Perannya langsung Admin.
     """
     nama, email = nama.strip(), email.strip().lower()
     fields: dict[str, str] = {}
