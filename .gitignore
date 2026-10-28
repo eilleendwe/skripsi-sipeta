@@ -1,1 +1,17 @@
+# Python
 venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+storage/
+ipynb/
+docs/
+.claude/
+.vscode/
+.env
+*.env
+desktop.ini
+Thumbs.db
+*.tar.gz
+*.md
+*.ps1

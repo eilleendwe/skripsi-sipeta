@@ -1,0 +1,27 @@
+{
+  "judul": "Perancangan Sistem Pemantauan Perubahan Tutupan Lahan Terbangun di Tangerang Menggunakan Random Forest dan Convolutional LSTM dengan Pra-Pemrosesan Hermite Interpolation",
+  "institusi": "",
+  "penulis": {
+    "nama": "Eilleen",
+    "nim": "535230051",
+    "prodi": "Teknik Informatika",
+    "email": "eilleen.535230051@stu.untar.ac.id"
+  },
+  "pembimbing": [
+    {
+      "nama": "Prof. Dr. Ir. Dyah Erny Herwindiati, M.Si",
+      "peran": "Dosen Pembimbing I"
+    },
+    {
+      "nama": "Janson Hendryli, S.Kom., M.Kom",
+      "peran": "Dosen Pembimbing II"
+    }
+  ],
+  "sumber_data": [
+    {
+      "nama": "Citra Sentinel-2 Level-2A",
+      "keterangan": "Copernicus Data Space Ecosystem (ESA). Band B02–B12 dan lapisan SCL resolusi 10–20 m.",
+      "url": "https://browser.dataspace.copernicus.eu/"
+    }
+  ]
+}
