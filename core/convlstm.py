@@ -167,15 +167,14 @@ def _spatial_scores(t, p):
 
 def evaluate_predictions(before, y_true, y_prob, threshold=THRESHOLD):
     """
-    Metrik peta model dan persistensi (anggap tidak ada perubahan dari `before`, peta tahun
-    terakhir yang teramati). -1 = nodata. FoM cuma menilai piksel yang berubah 0 -> 1.
+    Metrik peta model. `before` = peta tahun terakhir yang teramati, -1 = nodata.
+    FoM cuma menilai piksel yang berubah 0 -> 1.
     """
     y_pred = (y_prob > threshold)
     valid = (y_true != -1)
 
     t = (y_true == 1)[valid]
     m = _spatial_scores(t, y_pred[valid])
-    b = _spatial_scores(t, (before == 1)[valid])      # baseline: tidak ada perubahan
 
     valid_fom = (before != -1) & valid
     hits = int(np.sum((before == 0) & (y_true == 1) & y_pred & valid_fom))
@@ -184,65 +183,18 @@ def evaluate_predictions(before, y_true, y_prob, threshold=THRESHOLD):
     fom = _div(hits, hits + misses + false_alarms)
 
     return {
-        "oa": m["oa"], "precision": m["precision"], "recall": m["recall"],
+        "akurasi": m["oa"], "precision": m["precision"], "recall": m["recall"],
         "f1": m["f1"], "iou": m["iou"],
         "hits": hits, "misses": misses, "false_alarms": false_alarms, "fom": fom,
-        "persist_oa": b["oa"], "persist_f1": b["f1"], "persist_iou": b["iou"],
         "tp": m["tp"], "fp": m["fp"], "fn": m["fn"], "tn": m["tn"],
     }
 
 
-def area_errors(before, y_true, y_prob, km2_sel, threshold=THRESHOLD):
-    """
-    Error luas terbangun per kecamatan (km²) untuk model dan persistensi.
-    `km2_sel[i]` = luas satu sel 64x64 di kecamatan ke-i.
-    """
-    act, pred, pers = [], [], []
-    for i, s in enumerate(km2_sel):
-        valid = (y_true[i] != -1)
-        act.append(np.sum((y_true[i] == 1) & valid) * s)
-        pred.append(np.sum((y_prob[i] > threshold) & valid) * s)
-        pers.append(np.sum((before[i] == 1) & valid) * s)
-    act, pred, pers = map(np.asarray, (act, pred, pers))
-
-    def _scores(p):
-        err = p - act
-        pos = act > 0
-        ss_tot = np.sum((act - act.mean()) ** 2)
-        return {
-            "MAE_km2": float(np.mean(np.abs(err))),
-            "RMSE_km2": float(np.sqrt(np.mean(err ** 2))),
-            "MAPE_%": float(np.mean(np.abs(err[pos]) / act[pos]) * 100) if pos.any() else float("nan"),
-            "R2": float(1 - np.sum(err ** 2) / ss_tot) if ss_tot > 0 else float("nan"),
-            "bias_total_%": float(err.sum() / act.sum() * 100) if act.sum() > 0 else float("nan"),
-        }
-
-    out = _scores(pred)
-    out.update({f"persist_{k}": v for k, v in _scores(pers).items()})
-    return out
-
-
-def evaluate_all(before, y_true, y_prob, km2_sel):
-    """Semua metrik peta + luas dalam satu dict"""
-    m = evaluate_predictions(before, y_true, y_prob)
-    m["akurasi"] = m.pop("oa")
-    m["persist_akurasi"] = m.pop("persist_oa")
-    valid = (y_true != -1)
-    b = _spatial_scores((y_true == 1)[valid], (before == 1)[valid])
-    m["persist_precision"], m["persist_recall"] = b["precision"], b["recall"]
-    m["persist_fom"] = 0.0
-    m.update(area_errors(before, y_true, y_prob, km2_sel))
-    return m
-
-
-def confusion_from_maps(before, y_true, y_pred_bin, only_unbuilt_before=False):
+def confusion_from_maps(before, y_true, y_pred_bin):
     """
     Confusion matrix piksel [[TN, FP], [FN, TP]], baris = aktual. Nodata tidak dihitung.
-    `only_unbuilt_before` cuma ambil piksel yang awalnya nonterbangun (yang bisa berubah 0 -> 1).
     """
     valid = (y_true != -1) & (before != -1)
-    if only_unbuilt_before:
-        valid &= (before == 0)
     t = (y_true == 1)[valid]
     p = (y_pred_bin == 1)[valid]
     return [[int((~t & ~p).sum()), int((~t & p).sum())],

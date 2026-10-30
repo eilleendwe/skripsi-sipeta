@@ -139,19 +139,10 @@ def _skor(nilai) -> str:
 
 
 def _tabel_metrik(m: dict) -> pd.DataFrame:
-    """Tabel model vs persistensi untuk satu tahun test"""
-    baris = [
-        ("Accuracy", "akurasi", _skor), ("Precision", "precision", _skor), ("Recall", "recall", _skor),
-        ("F1-score", "f1", _skor), ("IoU", "iou", _skor), ("FoM", "fom", _skor),
-        ("MAE luas (km²)", "MAE_km2", lambda v: "-" if v is None else fmt.angka(v, 3)),
-        ("RMSE luas (km²)", "RMSE_km2", lambda v: "-" if v is None else fmt.angka(v, 3)),
-        ("MAPE luas", "MAPE_%", lambda v: "-" if v is None else fmt.persen(v, 2)),
-        ("R² luas", "R2", _skor),
-        ("Bias total luas", "bias_total_%", lambda v: "-" if v is None else fmt.persen(v, 2)),
-    ]
-    return pd.DataFrame(
-        [{"Metrik": label, "Model": f(m.get(k)), "Persistensi": f(m.get(f"persist_{k}"))} for label, k, f in baris]
-    )
+    """Tabel metrik model untuk satu tahun test"""
+    baris = [("Accuracy", "akurasi"), ("Precision", "precision"), ("Recall", "recall"), ("F1-score", "f1"),
+             ("FoM", "fom")]
+    return pd.DataFrame([{"Metrik": label, "Nilai": _skor(m.get(k))} for label, k in baris])
 
 
 def _evaluasi(calon: dict) -> None:
@@ -168,23 +159,11 @@ def _evaluasi(calon: dict) -> None:
 
     c_cm, c_tabel = st.columns([1, 1.2], gap="large")
     with c_cm:
-        layout.section(f"Confusion matrix model, {tahun}")
-        charts.confusion_matrix(u["confusion"]["model"], ev["label_kelas"])
-        layout.metric_cards([
-            ("Accuracy", _skor(u["metrik"]["akurasi"])), ("Precision", _skor(u["metrik"]["precision"])),
-            ("Recall", _skor(u["metrik"]["recall"])), ("F1-score", _skor(u["metrik"]["f1"])),
-        ], min_width=90)
+        layout.section(f"Confusion matrix, {tahun}")
+        charts.confusion_matrix(u["confusion"], ev["label_kelas"])
     with c_tabel:
-        layout.section(f"Model vs persistensi (peta {origin} disalin)")
+        layout.section(f"Metrik, {tahun}")
         st.dataframe(_tabel_metrik(u["metrik"]), hide_index=True, width="stretch", height="content")
-
-    c_pers, c_ubah = st.columns(2, gap="large")
-    with c_pers:
-        layout.section(f"Persistensi, {tahun}")
-        charts.confusion_matrix(u["confusion"]["persistensi"], ev["label_kelas"], height=220)
-    with c_ubah:
-        layout.section(f"Model, hanya piksel nonterbangun di {origin}")
-        charts.confusion_matrix(u["confusion"]["perubahan"], ["Tidak berubah", "Jadi terbangun"], height=220)
 
     c_loss, c_info = st.columns([1.4, 1], gap="large")
     with c_loss:
@@ -209,10 +188,9 @@ def _evaluasi(calon: dict) -> None:
 
     st.caption(
         f"Test {ev['tahun']['test'][0]} diprediksi 1 langkah dari {origin} (setara prediksi 2026); tahun berikutnya "
-        "secara rekursif (setara prediksi 2027). Sebagian besar piksel tidak berubah dari tahun ke tahun, jadi "
-        "persistensi pun sudah akurat: selalu bandingkan model dengan persistensi. FoM hanya menilai piksel yang "
-        "berubah dari nonterbangun menjadi terbangun (persistensi selalu 0). Label adalah peta klasifikasi berbasis "
-        "NDBI yang sudah dibersihkan dengan aturan konsistensi waktu, bukan kebenaran lapangan."
+        "secara rekursif (setara prediksi 2027). FoM hanya menilai piksel yang berubah dari nonterbangun menjadi "
+        "terbangun. Label adalah peta klasifikasi berbasis NDBI yang sudah dibersihkan dengan aturan konsistensi "
+        "waktu, bukan kebenaran lapangan."
     )
 
 

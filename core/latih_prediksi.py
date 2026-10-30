@@ -123,7 +123,6 @@ def _latih(job_id, folder, kecamatan_list, p):
                           f"{TAHUN_DATA[0]}–{TAHUN_DATA[-1]}.")
     # Diurutkan wilayah__kecamatan supaya urutan sampelnya tetap.
     kec_ids = [k["id"] for k in sorted(kecamatan_list, key=lambda k: (k["wilayah_id"], k["id"])) if k["id"] in peta]
-    km2_sel = [peta_tahunan.km2_per_sel(peta[k]["asli_terakhir"].shape) for k in kec_ids]
 
     # --- Pembagian tahun target: train, validasi, test (urut waktu) -------------
     L = p["sequence_length"]
@@ -163,12 +162,8 @@ def _latih(job_id, folder, kecamatan_list, p):
         uji.append({
             "tahun": ty,
             "langkah": step + 1,
-            "metrik": _tanpa_nan(convlstm.evaluate_all(before, y_true, probs[step], km2_sel)),
-            "confusion": {
-                "model": convlstm.confusion_from_maps(before, y_true, pred),
-                "persistensi": convlstm.confusion_from_maps(before, y_true, before == 1),
-                "perubahan": convlstm.confusion_from_maps(before, y_true, pred, only_unbuilt_before=True),
-            },
+            "metrik": _tanpa_nan(convlstm.evaluate_predictions(before, y_true, probs[step])),
+            "confusion": convlstm.confusion_from_maps(before, y_true, pred),
         })
 
     # --- Model final: semua target sampai 2025, epoch sama -----------------------
