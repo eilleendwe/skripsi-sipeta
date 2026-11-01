@@ -145,9 +145,7 @@ def _evaluasi(calon: dict) -> None:
             ("Label terbangun (acuan NDBI)", fmt.persen(ev["persen_terbangun_acuan"])),
             ("Waktu latih", f"{fmt.angka(ev['waktu_latih_detik'], 1)} detik"),
         ])
-        st.caption("Metrik mengukur kesesuaian dengan label acuan berbasis NDBI pada blok uji di kecamatan yang "
-                   "sama, bukan kebenaran lapangan. Angka ini lebih optimis daripada uji pada kecamatan lain dan "
-                   "tidak sebanding langsung dengan hasil notebook.")
+        st.caption("Metrik mengukur kesesuaian dengan label acuan berbasis NDBI pada blok uji di kecamatan yang sama.")
 
 
 layout.page_header("Klasifikasi")

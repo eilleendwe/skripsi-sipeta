@@ -127,10 +127,7 @@ def _hyperparameter(errors: dict, nonaktif: bool) -> dict:
     split = models.pembagian_tahun(params) if params["val_ratio"] > 0 else None
     if split:
         st.caption(f"Tahun target {_tahun(split['train'] + split['val'] + split['test'])} dibagi urut waktu: "
-                   f"train {_tahun(split['train'])}, validasi {_tahun(split['val'])}, test {_tahun(split['test'])}. "
-                   "Latih berjalan tiga kali (validasi dengan early stopping, uji, lalu model final sampai 2025); "
-                   "di CPU bisa memakan waktu lama. Pemantauan berlanjut jika Anda pindah halaman lalu kembali, "
-                   "selama tab browser ini tidak ditutup.")
+                   f"train {_tahun(split['train'])}, validasi {_tahun(split['val'])}, test {_tahun(split['test'])}.")
     return params
 
 

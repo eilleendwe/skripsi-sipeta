@@ -2,13 +2,12 @@ import streamlit as st
 
 from services import models, predict, roles
 from services.errors import ServiceError
-from ui import badges, fmt, forms, guard, hasil as hasil_ui, layout
+from ui import fmt, forms, guard, hasil as hasil_ui, layout
 
 user = guard.require_role(roles.USER)
 
 P = "f_pc"
 HASIL = "pc_hasil" 
-_LENCANA_REKURSIF = "prediksi rekursif — akurasi lebih rendah"
 
 
 def _form() -> dict:
@@ -21,12 +20,7 @@ def _form() -> dict:
         st.error(e.message, icon=":material/cloud_off:")
         st.stop()
 
-    tahun = forms.select(
-        c_tahun, "Tahun", predict.TAHUN_PREDIKSI, f"{P}_tahun", placeholder="Pilih tahun",
-        format_func=lambda t: f"{t} (rekursif)" if predict.is_recursive(t) else str(t),
-    )
-    if tahun and predict.is_recursive(tahun):
-        c_tahun.html(badges.pill_html(_LENCANA_REKURSIF, "amber", wrap=True))
+    tahun = forms.select(c_tahun, "Tahun", predict.TAHUN_PREDIKSI, f"{P}_tahun", placeholder="Pilih tahun")
 
     for pesan in peringatan:
         st.warning(pesan, icon=":material/warning:")
@@ -39,7 +33,6 @@ def _form() -> dict:
 
 def _hasil(hasil: dict) -> None:
     lebar, tinggi = hasil["ukuran_piksel"]
-    sel_h, sel_w = hasil["ukuran_sel_m"]
     acuan, tahun = hasil["tahun_acuan"], hasil["tahun"]
     keterangan = f"{lebar} × {tinggi} piksel · 1 piksel = {fmt.angka(hasil['resolusi_m'], 0)} m"
     with st.container(key="kanvas_pc"):
@@ -69,7 +62,9 @@ def _hasil(hasil: dict) -> None:
             ("Masukan", masukan),
         ])
         if hasil["rekursif"]:
-            badges.pill(_LENCANA_REKURSIF, "amber")
+            st.info(f"Akurasi prediksi {tahun} cenderung lebih rendah daripada {acuan + 1} karena memakai hasil "
+                    f"prediksi {acuan + 1} sebagai masukan, sehingga kesalahan pada {acuan + 1} ikut terbawa.",
+                    icon=":material/info:")
         hasil_ui.save_download("pc", hasil, predict, "Hasil prediksi disimpan.")
     with c_luas:
         layout.metric_cards([
@@ -87,13 +82,6 @@ def _hasil(hasil: dict) -> None:
             ("Luas versi 64×64", f"{acuan}: {fmt.km2(hasil['luas_acuan_64'])} · "
                                  f"{tahun}: {fmt.km2(hasil['luas_terbangun_64'])}"),
         ])
-
-    st.caption(
-        f"ConvLSTM bekerja pada peta 64×64 (1 sel ≈ {sel_h} × {sel_w} m untuk kecamatan ini). Peta 10 m disusun "
-        f"dari peta aktual {acuan}: sel yang menurut model berubah diganti seluruhnya, sel lain tetap memakai detail "
-        f"asli {acuan}. Jadi detail halus berasal dari data {acuan}, sedangkan perubahan hasil prediksi berupa kotak "
-        f"seukuran satu sel model. Luas utama dihitung dari peta 10 m; versi 64×64 hanya pembanding."
-    )
 
 
 layout.page_header("Prediksi")

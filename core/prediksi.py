@@ -42,7 +42,7 @@ def jalankan(job_id: str, folder: Path, model_row: dict, kecamatan: dict, tahun:
     jobs.update(job_id, 0.4, "Memuat model ConvLSTM")
     model = muat_model(model_row["path_model"])
     langkah = tahun - terakhir
-    jobs.update(job_id, 0.6, f"Prediksi {tahun}" + (f" ({langkah} langkah, rekursif)" if langkah > 1 else ""))
+    jobs.update(job_id, 0.6, f"Prediksi {tahun}" + (f" ({langkah} langkah)" if langkah > 1 else ""))
     probs, bins = convlstm.forecast_recursive(model, window[np.newaxis, ..., np.newaxis], langkah, threshold)
     biner = bins[-1][0]
 

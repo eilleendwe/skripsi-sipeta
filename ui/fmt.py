@@ -43,7 +43,5 @@ def rentang(awal: date | None, akhir: date | None, tahun_saja: bool = False) -> 
 
 
 def model_label(model: dict, cakupan: str) -> str:
-    """Opsi dropdown model: nama · cakupan · metrik utama · tanggal latih"""
-    metrik = model["evaluasi"]["metrik"]
-    utama = f"F1 {skor(metrik['f1'])}" if "f1" in metrik else f"IoU {skor(metrik['iou'])}"
-    return f"{model['nama']} · {cakupan} · {utama} · {tanggal(model['tanggal_latih'])}"
+    """Opsi dropdown model: nama · cakupan · tanggal latih"""
+    return f"{model['nama']} · {cakupan} · {tanggal(model['tanggal_latih'])}"
