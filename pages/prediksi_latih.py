@@ -64,9 +64,6 @@ def _data_unggah(errors: dict, nonaktif: bool) -> dict:
     if berkas:
         laporan = panel_arsip.laporan_folder(berkas)
         kecamatan_ids = [b["kecamatan_id"] for b in laporan["baris"] if b["lengkap"]]
-    st.caption(f"Seperti Latih RF, folder ini hanya dipakai untuk pelatihan ini lalu dihapus dari server. Yang dipakai "
-               f"hanya kecamatan dengan peta lengkap {arsip.TAHUN_DATA[0]}–{arsip.TAHUN_DATA[-1]}. Prediksi Citra "
-               "tetap membaca arsip di server, jadi kecamatan yang ingin diprediksi juga harus ada di arsip.")
     return {"wilayah_id": None, "kecamatan_ids": kecamatan_ids, "berkas": berkas}
 
 
