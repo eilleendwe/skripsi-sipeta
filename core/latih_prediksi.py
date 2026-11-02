@@ -180,7 +180,7 @@ def _latih(job_id, folder, kecamatan_list, p):
             "model_file": None,  # diisi saat model disimpan
             "model_type": "ConvLSTMManual (Persamaan 2.39-2.44, tanpa peephole)",
             "framework": f"TensorFlow {tf.__version__}",
-            "input": "peta klasifikasi 0/1 per tanggal (kecamatan_masked_rf_classified)",
+            "input": "peta klasifikasi 0/1 per tanggal",
             "data_source": "folder unggahan" if sumber == "unggah" else "arsip server",
             "annual_map": peta_tahunan.ATURAN,
             "training_kecamatan": kec_ids,

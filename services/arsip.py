@@ -1,9 +1,10 @@
 """
-Arsip klasifikasi untuk ConvLSTM: peta 0/1 per tanggal (RF_LABEL_*.tif) per kecamatan.
+Arsip klasifikasi untuk ConvLSTM: peta 0/1 per tanggal per kecamatan.
 Admin bisa mengunggahnya sebagai folder.
 """
 
 import re
+from collections import Counter
 from pathlib import PurePosixPath
 from typing import Iterator
 
@@ -13,9 +14,11 @@ from core import operasi
 from services import auth, backend, regions, roles
 from services.errors import ServiceError
 
-TAHUN_DATA = list(range(2016, 2026))  # tahun yang dibutuhkan ConvLSTM per kecamatan
+TAHUN_DATA = list(range(2016, 2026))
 _TANGGAL_RE = re.compile(r"\d{4}-?\d{2}-?\d{2}")
-_RF_LABEL_RE = re.compile(r"RF_LABEL_.*\.tif", re.IGNORECASE)
+_TIF_RE = re.compile(r".+\.tiff?", re.IGNORECASE)
+# nama hasil unduhan Klasifikasi Citra
+_UNDUHAN_RE = re.compile(r"klasifikasi_(.+)_(\d{4}-\d{2}-\d{2})\.tiff?", re.IGNORECASE)
 
 
 @st.cache_data(ttl=60, show_spinner=False)
@@ -32,22 +35,31 @@ def lengkap(kecamatan_ids: list[str]) -> list[str]:
 
 def scan_folder(nama_berkas: list[str]) -> dict:
     """
-    Kenali isi folder unggahan dari nama berkasnya saja. Struktur yang dibaca:
-    .../<kecamatan>/<YYYY-MM-DD>/RF_LABEL_*.tif, jadi yang dipilih boleh folder induk, satu folder
-    wilayah, atau satu folder kecamatan. Isi berkasnya baru dicek saat diunggah.
+    Kenali isi folder unggahan dari nama berkasnya saja. Yang dibaca .../<kecamatan>/<YYYY-MM-DD>/*.tif
+    (satu .tif per folder tanggal) atau hasil unduhan klasifikasi_<kecamatan>_<tanggal>.tif di folder mana saja.
+    Isi berkasnya baru dicek saat diunggah.
     """
     per_kecamatan, tak_dikenal, diabaikan = {}, set(), 0
-    for nama in nama_berkas:
-        bagian = PurePosixPath(nama.replace("\\", "/")).parts
-        if len(bagian) < 3 or not _TANGGAL_RE.fullmatch(bagian[-2]) or not _RF_LABEL_RE.fullmatch(bagian[-1]):
+    paths = [PurePosixPath(nama.replace("\\", "/")) for nama in nama_berkas]
+    # folder tanggal yang isinya banyak .tif kemungkinan citra mentah, jadi dilewati
+    jumlah_per_folder = Counter(p.parent for p in paths)
+    for nama, path in zip(nama_berkas, paths):
+        bagian = path.parts
+        unduhan = _UNDUHAN_RE.fullmatch(path.name)
+        if unduhan:
+            nama_kecamatan, tanggal = unduhan.groups()
+        elif (len(bagian) >= 3 and _TANGGAL_RE.fullmatch(bagian[-2]) and _TIF_RE.fullmatch(bagian[-1])
+              and jumlah_per_folder[path.parent] == 1):
+            nama_kecamatan, tanggal = bagian[-3], bagian[-2]
+        else:
             diabaikan += 1
             continue
-        kecamatan = regions.cari_kecamatan(bagian[-3])
+        kecamatan = regions.cari_kecamatan(nama_kecamatan)
         if kecamatan is None:
-            tak_dikenal.add(bagian[-3])
+            tak_dikenal.add(nama_kecamatan)
             continue
         # Satu berkas per tanggal, yang dipakai berkas pertama.
-        per_kecamatan.setdefault(kecamatan["id"], {}).setdefault(bagian[-2], nama)
+        per_kecamatan.setdefault(kecamatan["id"], {}).setdefault(tanggal, nama)
 
     baris = []
     for kec_id, per_tanggal in sorted(per_kecamatan.items()):
@@ -60,14 +72,13 @@ def scan_folder(nama_berkas: list[str]) -> dict:
 
 def kemas_berkas(laporan: dict, berkas: list, kecamatan_id: str, folder_kecamatan: bool = False) -> list:
     """
-    Berkas satu kecamatan sebagai (nama, berkas), dengan nama <tanggal>/<berkas>
-    (atau <kecamatan>/<tanggal>/<berkas> kalau `folder_kecamatan`).
+    Berkas satu kecamatan sebagai (nama, berkas), dengan nama <tanggal>/klasifikasi_<tanggal>.tif
+    (atau <kecamatan>/<tanggal>/... kalau `folder_kecamatan`).
     """
     isi = {b.name: b for b in berkas}
     files = []
     for tanggal, nama in laporan["berkas"][kecamatan_id].items():
-        dasar = PurePosixPath(nama.replace("\\", "/")).name
-        path = f"{tanggal}/{dasar}"
+        path = f"{tanggal}/klasifikasi_{tanggal}.tif"
         if folder_kecamatan:
             path = f"{kecamatan_id}/{path}"
         files.append((path, isi[nama]))

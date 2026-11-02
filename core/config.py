@@ -34,6 +34,8 @@ def _pengaturan(nama: str, bawaan: str | None = None) -> str | None:
 
 def tujuan_db(url: str) -> str:
     """host:port/database tanpa password, aman untuk dicetak"""
+    if not url:
+        return "SIPETA_DB belum diatur"
     from psycopg.conninfo import conninfo_to_dict
     try:
         info = conninfo_to_dict(url)
@@ -46,6 +48,11 @@ def periksa_db_url() -> None:
     """
     Cek SIPETA_DB bisa dibaca. Dipanggil saat app start, supaya salah tempel langsung ketahuan.
     """
+    if not DB_URL:
+        raise RuntimeError(
+            "Pengaturan SIPETA_DB belum diatur. Tambahkan SIPETA_DB di .streamlit/secrets.toml "
+            "atau atur environment variable SIPETA_DB."
+        )
     from psycopg.conninfo import conninfo_to_dict
     try:
         conninfo_to_dict(DB_URL)
@@ -55,7 +62,7 @@ def periksa_db_url() -> None:
             f"waktu ditempel. Tulis ulang dalam satu baris tanpa spasi. Detail: {e}") from None
 
 
-DB_URL = _pengaturan("SIPETA_DB", "postgresql://postgres:lambo@localhost:5432/sipeta")
+DB_URL = _pengaturan("SIPETA_DB")
 STORAGE = Path(_pengaturan("SIPETA_STORAGE", str(ROOT / "storage")))
 
 # "lokal" = berkas cuma di folder STORAGE. "s3" = berkas disimpan di bucket (Backblaze B2, dll.)

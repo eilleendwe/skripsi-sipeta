@@ -432,16 +432,16 @@ def bandingkan(awal: int, akhir: int) -> dict:
 
 # --- Latih model prediksi (ConvLSTM) -------------------------------------------------------
 
-def _berkas_rf_label(files: Unggahan):
-    """(bagian path, isi) untuk unggahan .../<tanggal>/RF_LABEL_*.tif; berkas lain dilewati"""
+def _berkas_peta(files: Unggahan):
+    """(bagian path, isi) untuk unggahan .../<tanggal>/*.tif; berkas lain dilewati"""
     for nama, isi in files:
         bagian = _bagian(nama)
         if (len(bagian) >= 2 and peta_tahunan.TANGGAL_RE.fullmatch(bagian[-2])
-                and peta_tahunan.RF_LABEL_RE.fullmatch(bagian[-1])):
+                and peta_tahunan.PETA_RE.fullmatch(bagian[-1])):
             yield bagian, isi
 
 
-def _periksa_rf_label(label: str, isi: bytes, ukuran: tuple | None) -> tuple:
+def _periksa_peta(label: str, isi: bytes, ukuran: tuple | None) -> tuple:
     """
     Cek berkas berisi peta 0/1/255 dan ukurannya sama dengan berkas lain di kecamatan itu.
     Mengembalikan ukuran rasternya.
@@ -467,16 +467,16 @@ def arsip_klasifikasi() -> dict[str, list[int]]:
 
 def unggah_arsip_klasifikasi(kecamatan_id: str, files: Unggahan) -> dict:
     """
-    Tambah atau ganti peta klasifikasi satu kecamatan. Nama berkas: <tanggal>/RF_LABEL_*.tif.
+    Tambah atau ganti peta klasifikasi satu kecamatan. Nama berkas: <tanggal>/<nama>.tif.
     Semua berkas dicek dulu; kalau ada satu yang tidak valid, tidak ada yang ditulis.
     """
     kecamatan = _kecamatan(kecamatan_id)
-    berkas = {bagian[-2]: (Path(bagian[-1]).name, _isi(isi)) for bagian, isi in _berkas_rf_label(files)}
+    berkas = {bagian[-2]: (Path(bagian[-1]).name, _isi(isi)) for bagian, isi in _berkas_peta(files)}
     if not berkas:
-        raise ProsesError("Tidak ada berkas <tanggal>/RF_LABEL_*.tif yang dikenali.")
+        raise ProsesError("Tidak ada peta klasifikasi <tanggal>/*.tif yang dikenali.")
     ukuran = None
     for tanggal, (nama, isi) in sorted(berkas.items()):
-        ukuran = _periksa_rf_label(f"{kecamatan['nama']} {tanggal}/{nama}", isi, ukuran)
+        ukuran = _periksa_peta(f"{kecamatan['nama']} {tanggal}/{nama}", isi, ukuran)
 
     folder = peta_tahunan.folder_arsip(kecamatan["wilayah_id"], kecamatan["id"])
     for tanggal, (nama, isi) in berkas.items():
@@ -507,7 +507,7 @@ def mulai_latih_prediksi(kecamatan_ids: list[str], params: dict) -> str:
 
 def mulai_latih_prediksi_unggah(params: dict, files: Unggahan) -> str:
     """
-    Latih ConvLSTM dari folder unggahan (<kecamatan>/<tanggal>/RF_LABEL_*.tif). Datanya cuma dipakai
+    Latih ConvLSTM dari folder unggahan (<kecamatan>/<tanggal>/*.tif). Datanya cuma dipakai
     untuk pelatihan ini lalu dihapus, tidak masuk arsip.
     """
     from core import latih_prediksi
@@ -516,18 +516,18 @@ def mulai_latih_prediksi_unggah(params: dict, files: Unggahan) -> str:
     folder = TMP_DIR / job_id
     kecamatan, ukuran = {}, {}
     try:
-        for bagian, isi in _berkas_rf_label(files):
+        for bagian, isi in _berkas_peta(files):
             if len(bagian) < 3:
                 continue
             k = kecamatan.get(bagian[-3]) or _kecamatan(bagian[-3])
             kecamatan[k["id"]] = k
             isi = _isi(isi)
-            ukuran[k["id"]] = _periksa_rf_label(f"{k['nama']} {bagian[-2]}/{bagian[-1]}", isi, ukuran.get(k["id"]))
+            ukuran[k["id"]] = _periksa_peta(f"{k['nama']} {bagian[-2]}/{bagian[-1]}", isi, ukuran.get(k["id"]))
             tujuan = folder / "input" / k["id"] / bagian[-2]
             tujuan.mkdir(parents=True, exist_ok=True)
             (tujuan / Path(bagian[-1]).name).write_bytes(isi)
         if not kecamatan:
-            raise ProsesError("Tidak ada berkas <kecamatan>/<tanggal>/RF_LABEL_*.tif yang dikenali.")
+            raise ProsesError("Tidak ada peta klasifikasi <kecamatan>/<tanggal>/*.tif yang dikenali.")
     except ProsesError:
         buang_job(job_id)
         raise

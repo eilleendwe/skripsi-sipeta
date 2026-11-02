@@ -34,12 +34,12 @@ _KLASIFIKASI = """
 """
 
 _PREDIKSI = """
-Masukan ConvLSTM adalah **peta klasifikasi 0/1 per tanggal** (`RF_LABEL_*.tif`, hasil notebook Random Forest), bukan citra Sentinel-2. Per kecamatan, sistem membuat satu peta per tahun 2016–2025 (komposit mayoritas + konsistensi waktu), lalu mengecilkannya ke 64×64 untuk model.
+Masukan ConvLSTM adalah **peta klasifikasi 0/1 per tanggal** (GeoTIFF hasil Klasifikasi Citra), bukan citra Sentinel-2. Per kecamatan, sistem membuat satu peta per tahun 2016–2025 (komposit mayoritas + konsistensi waktu), lalu mengecilkannya ke 64×64 untuk model.
 
 **Menyiapkan arsip klasifikasi di server (khusus Admin)**
 
 1. Buka **Prediksi → Latih model**, lalu buka bagian **Arsip klasifikasi di server**. Di sana terlihat berapa kecamatan per kota/kabupaten yang petanya sudah lengkap 2016–2025.
-2. Pada **Folder arsip klasifikasi**, pilih folder `kecamatan_masked_rf_classified`, satu folder wilayah, atau satu folder kecamatan. Periksa tabelnya: jumlah tanggal, rentang tahun, status lengkap, dan kondisi arsip di server.
+2. Pada **Folder arsip klasifikasi**, pilih folder induk, satu folder wilayah, satu folder kecamatan, atau folder berisi hasil unduhan Klasifikasi Citra. Periksa tabelnya: jumlah tanggal, rentang tahun, status lengkap, dan kondisi arsip di server.
 3. Tekan **Unggah … kecamatan ke server**. Berkas diperiksa dulu (nilai 0/1/255, ukuran seragam); kecamatan yang berkasnya tidak valid ditolak dan diberi pesan. Tanggal yang sudah ada di server diganti, tanggal lain tetap.
 
 Arsip ini dipakai oleh opsi latih **Arsip di server** dan **selalu** menjadi masukan **Prediksi citra**. Cukup diunggah sekali, atau lagi saat ada data tahun baru.
@@ -91,15 +91,17 @@ batuceper/                              <- nama folder kecamatan
 **Peta klasifikasi (Prediksi)**
 
 ```text
-kecamatan_masked_rf_classified/         <- boleh juga satu folder wilayah atau satu folder kecamatan
-└── kota_tangerang/
-    └── batuceper/
-        ├── 2016-10-07/
-        │   └── RF_LABEL_2016-10-07.tif
-        └── ...
+peta_klasifikasi/                       <- boleh juga satu folder wilayah atau satu folder kecamatan
+├── kota_tangerang/
+│   └── batuceper/
+│       ├── 2016-10-07/
+│       │   └── peta.tif
+│       └── ...
+└── klasifikasi_benda_2016-10-07.tif
 ```
 
-- Nama berkas diawali `RF_LABEL_` dan berakhiran `.tif`; satu berkas per folder tanggal.
+- Dengan susunan folder, nama berkas bebas asal berakhiran `.tif`; satu berkas per folder tanggal. Folder tanggal yang berisi lebih dari satu `.tif` dianggap citra mentah dan diabaikan.
+- Berkas hasil unduhan GeoTIFF dari **Klasifikasi Citra** (`klasifikasi_<kecamatan>_<tanggal>.tif`) boleh langsung dikumpulkan di folder mana saja, asal namanya tidak diganti.
 - Nilai piksel hanya 0 (nonterbangun), 1 (terbangun), atau 255 (NoData), dan ukuran raster sama untuk semua tanggal dalam satu kecamatan.
 - Kecamatan baru bisa dipakai jika setiap tahun 2016–2025 punya minimal satu tanggal.
 """

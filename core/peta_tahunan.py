@@ -19,7 +19,7 @@ PATCH_SIZE = 64
 MAJORITY_MIN_FRAC = 0.5
 KM2_PIKSEL = LUAS_PIKSEL_M2 / 1e6
 TANGGAL_RE = re.compile(r"\d{4}-?\d{2}-?\d{2}")    # nama folder tanggal, mis. 2019-07-04 atau 20190704
-RF_LABEL_RE = re.compile(r"RF_LABEL_.*\.tif", re.IGNORECASE)
+PETA_RE = re.compile(r".+\.tiff?", re.IGNORECASE)
 
 # Disimpan di konfigurasi model, supaya ketahuan aturan apa yang dipakai saat latih.
 ATURAN = {
@@ -39,14 +39,14 @@ def folder_arsip(wilayah_id: str, kecamatan_id: str) -> Path:
 
 
 def daftar_berkas(folder: Path) -> dict[int, list[Path]]:
-    """{tahun: [berkas RF_LABEL, ...]} dari folder satu kecamatan (isinya folder tanggal), urut tanggal"""
+    """{tahun: [berkas peta, ...]} dari folder satu kecamatan (isinya folder tanggal), urut tanggal"""
     hasil = {}
     if not folder.is_dir():
         return hasil
     for d in sorted(folder.iterdir()):
         if not (d.is_dir() and TANGGAL_RE.match(d.name)):
             continue
-        tifs = sorted(p for p in d.iterdir() if RF_LABEL_RE.fullmatch(p.name))
+        tifs = sorted(p for p in d.iterdir() if PETA_RE.fullmatch(p.name))
         if tifs:
             hasil.setdefault(int(d.name[:4]), []).append(tifs[0])
     return hasil
@@ -60,7 +60,7 @@ def tahun_arsip() -> dict[tuple[str, str], set[int]]:
     hasil = {}
     for rel in storage.daftar(storage.relatif(ARSIP_KLASIFIKASI_DIR)):
         bagian = rel.split("/")
-        if len(bagian) == 5 and TANGGAL_RE.match(bagian[3]) and RF_LABEL_RE.fullmatch(bagian[4]):
+        if len(bagian) == 5 and TANGGAL_RE.match(bagian[3]) and PETA_RE.fullmatch(bagian[4]):
             hasil.setdefault((bagian[1], bagian[2]), set()).add(int(bagian[3][:4]))
     return hasil
 

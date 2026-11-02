@@ -52,9 +52,10 @@ def _data_arsip(errors: dict, nonaktif: bool) -> dict:
 
 def _data_unggah(errors: dict, nonaktif: bool) -> dict:
     berkas = st.file_uploader(
-        "Folder peta klasifikasi (RF_LABEL)", type=["tif", "tiff"], accept_multiple_files="directory",
+        "Folder peta klasifikasi", type=["tif", "tiff"], accept_multiple_files="directory",
         key=f"{P}_folder", disabled=nonaktif,
-        help="Boleh folder kecamatan_masked_rf_classified, satu folder wilayah, atau satu folder kecamatan.",
+        help="Boleh folder induk, satu folder wilayah, satu folder kecamatan, atau folder berisi hasil unduhan "
+             "Klasifikasi Citra.",
     ) or []
     forms.field_error(errors, "folder")
     with st.expander("Struktur folder yang dibaca sistem", icon=":material/account_tree:"):

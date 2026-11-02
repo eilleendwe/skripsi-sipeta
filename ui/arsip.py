@@ -11,14 +11,17 @@ from services.errors import ServiceError
 from ui import layout
 
 STRUKTUR = """\
-kecamatan_masked_rf_classified/     <- boleh folder ini, satu folder wilayah, atau satu folder kecamatan
-└── kota_tangerang/
-    ├── batuceper/                  <- nama folder = id atau nama kecamatan
-    │   ├── 2016-10-07/
-    │   │   └── RF_LABEL_2016-10-07.tif   (0 = nonterbangun, 1 = terbangun, 255 = NoData)
-    │   ├── 2017-07-04/
-    │   └── ...
-    └── ..."""
+peta_klasifikasi/                   <- boleh folder ini, satu folder wilayah, atau satu folder kecamatan
+├── kota_tangerang/
+│   ├── batuceper/                  <- nama folder = id atau nama kecamatan
+│   │   ├── 2016-10-07/
+│   │   │   └── peta.tif            <- nama bebas, satu .tif per folder tanggal
+│   │   ├── 2017-07-04/
+│   │   └── ...
+│   └── ...
+└── klasifikasi_benda_2016-10-07.tif   <- hasil unduhan Klasifikasi Citra, boleh di folder mana saja
+
+Nilai piksel: 0 = nonterbangun, 1 = terbangun, 255 = NoData."""
 _VERSI = "_arsip_versi"  # dinaikkan setelah unggah supaya kotak unggah kosong lagi
 _ERRORS = "_arsip_errors"
 
@@ -57,7 +60,8 @@ def laporan_folder(berkas: list, tersedia: dict | None = None) -> dict:
     if laporan["tak_dikenal"]:
         catatan.append("folder bukan nama kecamatan, diabaikan: " + ", ".join(laporan["tak_dikenal"]))
     if laporan["diabaikan"]:
-        catatan.append(f"{laporan['diabaikan']} berkas di luar pola <tanggal>/RF_LABEL_*.tif diabaikan")
+        catatan.append(f"{laporan['diabaikan']} berkas bukan peta klasifikasi diabaikan "
+                       "(folder tanggal yang berisi lebih dari satu .tif dianggap citra mentah)")
     st.caption(" · ".join(catatan) + ".")
     return laporan
 
@@ -89,7 +93,8 @@ def panel(nonaktif: bool) -> None:
         berkas = st.file_uploader(
             "Folder arsip klasifikasi", type=["tif", "tiff"], accept_multiple_files="directory",
             key=f"arsip_folder_{versi}", disabled=nonaktif,
-            help="Kecamatan dikenali dari nama folder di atas folder tanggal. Berkas selain RF_LABEL_*.tif diabaikan.",
+            help="Kecamatan dikenali dari nama folder di atas folder tanggal, atau dari nama berkas hasil unduhan "
+                 "Klasifikasi Citra.",
         ) or []
         if not berkas:
             return
