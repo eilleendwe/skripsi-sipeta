@@ -5,7 +5,7 @@ jalankan pelatihan dengan progress bar, lalu Simpan/Buang.
 
 import streamlit as st
 
-from services import backend, models
+from services import models
 from services.errors import ServiceError
 from ui import fmt, layout
 
@@ -64,7 +64,7 @@ def run_if_started(prefix: str, algoritma: str, spec: dict) -> None:
             st.session_state[k_job] = (job_id, spec)
         else:
             job_id, spec = job
-        hasil = backend.tunggu_job(job_id, bar)
+        hasil = models.tunggu(job_id, bar)
     except ServiceError as e:
         st.session_state.pop(k_job, None)
         st.session_state[_k(prefix, "errors")] = e.fields or {"umum": e.message}

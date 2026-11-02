@@ -8,10 +8,14 @@ from collections import Counter
 from pathlib import PurePosixPath
 from typing import Iterator
 
+import numpy as np
+import rasterio
 import streamlit as st
+from rasterio.io import MemoryFile
 
-from core import operasi
-from services import auth, backend, regions, roles
+from core import db, peta_tahunan, storage
+from core.config import CACHE_TAHUNAN_DIR, LABEL_NODATA
+from services import auth, regions, roles
 from services.errors import ServiceError
 
 TAHUN_DATA = list(range(2016, 2026))
@@ -24,7 +28,9 @@ _UNDUHAN_RE = re.compile(r"klasifikasi_(.+)_(\d{4}-\d{2}-\d{2})\.tiff?", re.IGNO
 @st.cache_data(ttl=60, show_spinner=False)
 def tahun_tersedia() -> dict[str, list[int]]:
     """{kecamatan_id: [tahun, ...]} yang ada di arsip server"""
-    return backend.panggil(operasi.arsip_klasifikasi)
+    tersedia = peta_tahunan.tahun_arsip()
+    rows = db.fetch_all("SELECT id, wilayah_id FROM kecamatan")
+    return {r["id"]: sorted(tersedia.get((r["wilayah_id"], r["id"]), ())) for r in rows}
 
 
 def lengkap(kecamatan_ids: list[str]) -> list[str]:
@@ -70,19 +76,31 @@ def scan_folder(nama_berkas: list[str]) -> dict:
     return {"baris": baris, "berkas": per_kecamatan, "tak_dikenal": sorted(tak_dikenal), "diabaikan": diabaikan}
 
 
-def kemas_berkas(laporan: dict, berkas: list, kecamatan_id: str, folder_kecamatan: bool = False) -> list:
-    """
-    Berkas satu kecamatan sebagai (nama, berkas), dengan nama <tanggal>/klasifikasi_<tanggal>.tif
-    (atau <kecamatan>/<tanggal>/... kalau `folder_kecamatan`).
-    """
+def kemas_berkas(laporan: dict, berkas: list, kecamatan_id: str) -> dict:
+    """Berkas satu kecamatan dari hasil `scan_folder`: {tanggal: berkas}"""
     isi = {b.name: b for b in berkas}
-    files = []
-    for tanggal, nama in laporan["berkas"][kecamatan_id].items():
-        path = f"{tanggal}/klasifikasi_{tanggal}.tif"
-        if folder_kecamatan:
-            path = f"{kecamatan_id}/{path}"
-        files.append((path, isi[nama]))
-    return files
+    return {tanggal: isi[nama] for tanggal, nama in laporan["berkas"][kecamatan_id].items()}
+
+
+def periksa_peta(kecamatan: dict, berkas: dict) -> dict[str, bytes]:
+    """
+    Isi peta klasifikasi satu kecamatan sebagai {tanggal: bytes}. Semua berkas dicek dulu: harus GeoTIFF
+    bernilai 0/1/255 dengan ukuran yang sama. Kalau ada satu yang tidak valid, error.
+    """
+    hasil, ukuran = {}, None
+    for tanggal, b in sorted(berkas.items()):
+        label, isi = f"{kecamatan['nama']} {tanggal}", b.getvalue()
+        try:
+            with MemoryFile(isi) as mem, mem.open() as src:
+                peta = src.read(1)
+        except rasterio.errors.RasterioError:
+            raise ServiceError(f"{label}: bukan GeoTIFF yang valid.")
+        if not np.isin(peta, (0, 1, LABEL_NODATA)).all():
+            raise ServiceError(f"{label}: nilai piksel harus 0, 1, atau 255.")
+        if ukuran and peta.shape != ukuran:
+            raise ServiceError(f"{label}: ukuran raster {peta.shape} berbeda dengan berkas lain {ukuran}.")
+        ukuran, hasil[tanggal] = peta.shape, isi
+    return hasil
 
 
 def unggah(laporan: dict, berkas: list) -> Iterator[dict]:
@@ -98,9 +116,19 @@ def unggah(laporan: dict, berkas: list) -> Iterator[dict]:
         yield {"progress": i / len(laporan["baris"]), "label": f"Mengunggah {b['kecamatan']} "
                                                               f"({i + 1}/{len(laporan['baris'])})", "errors": None}
         try:
-            backend.panggil(operasi.unggah_arsip_klasifikasi, b["kecamatan_id"],
-                            kemas_berkas(laporan, berkas, b["kecamatan_id"]))
+            kecamatan = regions.get_kecamatan(b["kecamatan_id"])
+            peta = periksa_peta(kecamatan, kemas_berkas(laporan, berkas, kecamatan["id"]))
         except ServiceError as e:
             errors[b["kecamatan"]] = e.message  # kecamatan lain tetap diunggah
+            continue
+        folder = peta_tahunan.folder_arsip(kecamatan["wilayah_id"], kecamatan["id"])
+        for tanggal, isi in peta.items():
+            rel = storage.relatif(folder / tanggal)
+            storage.hapus(rel)  # tanggal yang sudah ada diganti
+            (folder / tanggal).mkdir(parents=True)
+            (folder / tanggal / f"klasifikasi_{tanggal}.tif").write_bytes(isi)
+            storage.kirim(rel)
+        # Arsip berubah, jadi cache peta tahunan kecamatan ini dihapus dan dibuat ulang nanti.
+        (CACHE_TAHUNAN_DIR / f"{kecamatan['id']}.npz").unlink(missing_ok=True)
     tahun_tersedia.clear()
     yield {"progress": 1.0, "label": "Selesai", "errors": errors}

@@ -4,13 +4,16 @@ import re
 
 import streamlit as st
 
-from core import operasi
-from services import backend
+from core import db
 
 
 @st.cache_data(ttl=600, show_spinner=False)
 def _wilayah() -> list[dict]:
-    return backend.panggil(operasi.daftar_wilayah)
+    wilayah = db.fetch_all("SELECT id, nama FROM wilayah ORDER BY nama")
+    kecamatan = db.fetch_all("SELECT id, nama, wilayah_id FROM kecamatan ORDER BY nama")
+    for w in wilayah:
+        w["kecamatan"] = [{"id": k["id"], "nama": k["nama"]} for k in kecamatan if k["wilayah_id"] == w["id"]]
+    return wilayah
 
 
 def list_wilayah() -> list[dict]:

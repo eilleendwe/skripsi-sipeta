@@ -1,6 +1,9 @@
+import shutil
+
 import streamlit as st
 
-from core import operasi
+from core import storage
+from core.config import CITRA_DIR, HASIL_DIR, MODEL_DIR, PREDIKSI_DIR, TMP_DIR, periksa_db_url
 from services import auth
 from services.errors import ServiceError
 from ui import layout, nav, sidebar
@@ -8,7 +11,12 @@ from ui import layout, nav, sidebar
 
 @st.cache_resource(show_spinner=False)
 def _siapkan() -> None:
-    operasi.siapkan()
+    """Sekali saat app start: cek pengaturan, buang sisa berkas sementara, buat folder"""
+    periksa_db_url()
+    storage.periksa()
+    shutil.rmtree(TMP_DIR, ignore_errors=True)
+    for folder in (TMP_DIR, MODEL_DIR, HASIL_DIR, CITRA_DIR, PREDIKSI_DIR):
+        folder.mkdir(parents=True, exist_ok=True)
 
 
 st.set_page_config(

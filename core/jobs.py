@@ -4,10 +4,14 @@ Job jalan di thread dalam proses, jadi tetap lanjut walau pengguna pindah halama
 """
 
 import logging
+import shutil
 import threading
+import time
 import traceback
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+
+from core.config import TMP_DIR
 
 log = logging.getLogger("sipeta")
 
@@ -23,6 +27,7 @@ class ProsesError(Exception):
 
     def __init__(self, pesan: str, fields: dict[str, str] | None = None):
         super().__init__(pesan)
+        self.message = pesan
         self.fields = fields or {}
 
 
@@ -72,5 +77,39 @@ def get(job_id: str) -> dict | None:
 
 
 def hapus(job_id: str) -> None:
+    """Buang job beserta berkas sementaranya"""
     with _lock:
         _jobs.pop(job_id, None)
+    shutil.rmtree(TMP_DIR / job_id, ignore_errors=True)
+
+
+def selesai(job_id: str) -> dict:
+    """Job yang sudah selesai. Error kalau tidak ada (mis. app sudah di-restart) atau belum selesai."""
+    job = get(job_id)
+    if job is None:
+        raise ProsesError("Hasil proses tidak ditemukan. Mungkin app sudah dijalankan ulang.")
+    if job["status"] != "selesai":
+        raise ProsesError("Proses belum selesai.")
+    return job
+
+
+def berkas(job_id: str, nama: str) -> bytes:
+    """Isi berkas hasil job yang belum disimpan, mis. klasifikasi.png"""
+    selesai(job_id)
+    return (TMP_DIR / job_id / nama).read_bytes()
+
+
+def tunggu(job_id: str, bar, jeda: float = 1.0):
+    """
+    Cek status job tiap `jeda` detik sambil update progress bar. Kalau selesai, hasil job-nya dikembalikan.
+    """
+    while True:
+        job = get(job_id)
+        if job is None:
+            raise ProsesError("Proses tidak ditemukan. Mungkin app sudah dijalankan ulang.")
+        bar.progress(job["progress"], text=job["label"])
+        if job["status"] == "selesai":
+            return job["hasil"]
+        if job["status"] == "gagal":
+            raise ProsesError(job["pesan"])
+        time.sleep(jeda)

@@ -1,8 +1,5 @@
-class ServiceError(Exception):
-    """Error yang pesannya boleh langsung ditampilkan ke pengguna"""
+from core.jobs import ProsesError
 
-    def __init__(self, message: str, fields: dict[str, str] | None = None):
-        super().__init__(message)
-        self.message = message
-        # Pesan per field form (kunci = nama field), kalau ada.
-        self.fields = fields or {}
+# Error yang pesannya boleh langsung ditampilkan ke pengguna. Sama dengan ProsesError di core,
+# jadi error dari core bisa langsung ditangkap halaman dengan `except ServiceError`.
+ServiceError = ProsesError

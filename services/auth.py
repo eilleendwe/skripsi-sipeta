@@ -6,12 +6,11 @@ database setiap rerun.
 """
 
 import re
-from datetime import date
 
 import streamlit as st
 
 from core import pengguna
-from services import backend, roles
+from services import roles
 from services.errors import ServiceError
 
 _SESSION_KEY = "auth_user_id"
@@ -32,9 +31,6 @@ def _password_error(password: str) -> str | None:
     return f"Kata sandi harus memuat {', '.join(kurang)}." if kurang else None
 
 
-def _rapikan(user: dict) -> dict:
-    return {**user, "tanggal_daftar": date.fromisoformat(user["tanggal_daftar"])}
-
 
 # --- Sesi -------------------------------------------------------------------
 
@@ -46,19 +42,19 @@ def current_user() -> dict | None:
     uid = st.session_state.get(_SESSION_KEY)
     if not uid:
         return None
-    user = backend.panggil(pengguna.detail, uid)
+    user = pengguna.detail(uid)
     if user is None:
         st.session_state.pop(_SESSION_KEY, None)
         return None
-    return _rapikan(user)
+    return user
 
 
 def login(email: str, password: str) -> dict:
     if not email.strip() or not password:
         raise ServiceError("Email dan kata sandi wajib diisi.")
-    user = backend.panggil(pengguna.masuk, email, password)
+    user = pengguna.masuk(email, password)
     st.session_state[_SESSION_KEY] = user["id"]
-    return _rapikan(user)
+    return user
 
 
 def logout() -> None:
@@ -93,15 +89,15 @@ def register(nama: str, email: str, password: str, konfirmasi: str) -> dict:
         raise ServiceError("Periksa kembali isian form.", fields)
 
     # Email yang sudah terdaftar ditolak di core.pengguna (pesannya muncul di field email).
-    user = backend.panggil(pengguna.daftar, nama, email, password)
+    user = pengguna.daftar(nama, email, password)
     st.session_state[_SESSION_KEY] = user["id"]
-    return _rapikan(user)
+    return user
 
 
 # --- Kelola Pengguna (Super Admin) ------------------------------------------
 
 def list_users(cari: str = "", role: str | None = None) -> list[dict]:
-    hasil = [_rapikan(u) for u in backend.panggil(pengguna.daftar_pengguna, cari, role)]
+    hasil = pengguna.daftar_pengguna(cari, role)
     return sorted(hasil, key=lambda u: (-roles.level(u["role"]), u["tanggal_daftar"], u["nama"]))
 
 
@@ -121,5 +117,4 @@ def change_role(target_id: int, new_role: str) -> dict:
     actor = current_user()
     if actor is None:
         raise ServiceError("Sesi berakhir. Silakan masuk kembali.")
-    user = backend.panggil(pengguna.ubah_peran, target_id, new_role, actor["id"])
-    return _rapikan(user)
+    return pengguna.ubah_peran(target_id, new_role, actor["id"])

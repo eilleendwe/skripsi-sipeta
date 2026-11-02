@@ -4,14 +4,17 @@ Model tersimpan dan pelatihan model.
 Random Forest (Klasifikasi) dan ConvLSTM (Prediksi) sama-sama dilatih sebagai job latar belakang.
 """
 
+import json
 import re
-from datetime import date, datetime
-from pathlib import PurePosixPath
+import shutil
+from datetime import date
+from pathlib import Path, PurePosixPath
 
 import streamlit as st
 
-from core import operasi
-from services import arsip, auth, backend, regions, roles
+from core import db, jobs, latih, storage
+from core.config import MODEL_DIR, TMP_DIR
+from services import arsip, auth, regions, roles, unggahan
 from services.errors import ServiceError
 
 RF = "rf"
@@ -88,9 +91,13 @@ REKOMENDASI = {
 
 # --- Baca -------------------------------------------------------------------
 
-_DAFTAR = {RF: operasi.daftar_model, CONVLSTM: operasi.daftar_model_prediksi}
-_DETAIL = {RF: operasi.detail_model, CONVLSTM: operasi.detail_model_prediksi}
-_SIMPAN = {RF: operasi.simpan_model, CONVLSTM: operasi.simpan_model_prediksi}
+# Tabel model per algoritma: (query kolom, syarat "model mencakup kecamatan X")
+_TABEL = {
+    RF: ("SELECT id, nama, kecamatan_id, evaluasi, hyperparameter, dibuat_oleh, dibuat_pada FROM model_klasifikasi ",
+         "kecamatan_id = %s"),
+    CONVLSTM: ("SELECT id, nama, kecamatan_ids, evaluasi, hyperparameter, dibuat_oleh, dibuat_pada FROM model_prediksi ",
+               "%s = ANY(kecamatan_ids)"),
+}
 
 
 def _dari_baris(algoritma: str, row: dict) -> dict:
@@ -103,7 +110,7 @@ def _dari_baris(algoritma: str, row: dict) -> dict:
         "kecamatan_ids": [row["kecamatan_id"]] if algoritma == RF else row["kecamatan_ids"],
         "evaluasi": row["evaluasi"],
         "params": row["hyperparameter"],
-        "tanggal_latih": datetime.fromisoformat(row["dibuat_pada"]).date(),
+        "tanggal_latih": row["dibuat_pada"].date(),
         "dibuat_oleh": row["dibuat_oleh"],
     }
 
@@ -121,16 +128,17 @@ def list_models(algoritma: str, kecamatan_id: str | None = None) -> list[dict]:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def _daftar(algoritma: str, kecamatan_id: str | None) -> list[dict]:
-    return backend.panggil(_DAFTAR[algoritma], kecamatan_id)
+    sql, cakupan = _TABEL[algoritma]
+    if kecamatan_id:
+        return db.fetch_all(sql + f"WHERE {cakupan} ORDER BY dibuat_pada DESC", (kecamatan_id,))
+    return db.fetch_all(sql + "ORDER BY dibuat_pada DESC")
 
 
 def get(algoritma: str, model_id: int | None) -> dict | None:
     if model_id is None:
         return None
-    try:
-        return _dari_baris(algoritma, backend.panggil(_DETAIL[algoritma], model_id))
-    except ServiceError:
-        return None
+    row = db.fetch_one(_TABEL[algoritma][0] + "WHERE id = %s", (model_id,))
+    return _dari_baris(algoritma, row) if row else None
 
 
 def coverage_label(model: dict) -> str:
@@ -292,15 +300,41 @@ def mulai_latih(algoritma: str, spec: dict, bar) -> str:
         files = _berkas_rf(spec)
         bar.progress(0.0, text=f"Menyiapkan {len(files)} berkas citra…")
         params = {k: v for k, v in spec["params"].items() if k != "train_ratio"}
-        return backend.panggil(operasi.mulai_latih, spec["kecamatan_id"], params, files)
+        job_id = jobs.buat("latih")
+        folder = TMP_DIR / job_id
+        if unggahan.simpan_band(files, folder / "input", pakai_subfolder_tanggal=True) == 0:
+            jobs.hapus(job_id)
+            raise ServiceError("Tidak ada berkas citra yang dikenali di folder unggahan.")
+        jobs.mulai(job_id, latih.jalankan, folder, regions.get_kecamatan(spec["kecamatan_id"]), params)
+        return job_id
+
+    from core import latih_prediksi  # memuat TensorFlow, jadi baru diimpor di sini
+    job_id = jobs.buat("latih_prediksi")
+    folder = TMP_DIR / job_id
+    folder.mkdir(parents=True)
     if spec.get("sumber") == SUMBER_UNGGAH:
-        # Cuma kecamatan yang lengkap 2016–2025 yang dikirim, karena yang lain tidak akan dipakai.
+        # Cuma kecamatan yang lengkap 2016–2025 yang dipakai. Petanya ditaruh di folder job, tidak masuk arsip.
         laporan = arsip.scan_folder([f.name for f in spec["berkas"]])
-        files = [berkas for b in laporan["baris"] if b["lengkap"]
-                 for berkas in arsip.kemas_berkas(laporan, spec["berkas"], b["kecamatan_id"], folder_kecamatan=True)]
-        bar.progress(0.0, text=f"Memeriksa {len(files)} peta klasifikasi…")
-        return backend.panggil(operasi.mulai_latih_prediksi_unggah, spec["params"], files)
-    return backend.panggil(operasi.mulai_latih_prediksi, spec["kecamatan_ids"], spec["params"])
+        kecamatan = [regions.get_kecamatan(b["kecamatan_id"]) for b in laporan["baris"] if b["lengkap"]]
+        bar.progress(0.0, text=f"Memeriksa peta klasifikasi {len(kecamatan)} kecamatan…")
+        try:
+            for k in kecamatan:
+                for tanggal, isi in arsip.periksa_peta(k, arsip.kemas_berkas(laporan, spec["berkas"], k["id"])).items():
+                    tujuan = folder / "input" / k["id"] / tanggal
+                    tujuan.mkdir(parents=True)
+                    (tujuan / f"klasifikasi_{tanggal}.tif").write_bytes(isi)
+        except ServiceError:
+            jobs.hapus(job_id)
+            raise
+    else:
+        kecamatan = [regions.get_kecamatan(k) for k in spec["kecamatan_ids"]]
+    jobs.mulai(job_id, latih_prediksi.jalankan, folder, kecamatan, spec["params"])
+    return job_id
+
+
+def tunggu(job_id: str, bar) -> dict:
+    """Tunggu job latih selesai sambil update progress bar, lalu kembalikan hasilnya"""
+    return jobs.tunggu(job_id, bar)
 
 
 def buat_draft(algoritma: str, spec: dict, job_id: str, hasil: dict) -> dict:
@@ -332,18 +366,64 @@ def _berkas_rf(spec: dict) -> list:
     ]
 
 
+def _slug(teks: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", teks.lower()).strip("_") or "model"
+
+
+def _simpan_berkas_model(job_id: str, berkas: str, dasar: str, config: dict) -> tuple[str, str]:
+    """
+    Salin model + konfigurasi (.json) dari folder job ke folder model. Mengembalikan path relatifnya.
+    """
+    path_model = MODEL_DIR / f"{dasar}{Path(berkas).suffix}"
+    path_config = MODEL_DIR / f"{dasar}.json"
+    shutil.copy2(TMP_DIR / job_id / berkas, path_model)
+    path_config.write_text(json.dumps({**config, "model_file": path_model.name}, indent=2, ensure_ascii=False),
+                           encoding="utf-8")
+    rel_model, rel_config = storage.relatif(path_model), storage.relatif(path_config)
+    storage.kirim(rel_model)
+    storage.kirim(rel_config)
+    return rel_model, rel_config
+
+
 def save(draft: dict) -> dict:
-    """Simpan calon model hasil `train`"""
+    """Simpan calon model hasil latih: berkas model ke storage, datanya ke tabel model"""
     user = _require_admin()
-    row = backend.panggil(_SIMPAN[draft["algoritma"]], draft["job_id"], draft["nama"], user["nama"])
-    _daftar.clear()  
-    return _dari_baris(draft["algoritma"], row)
+    algoritma, nama = draft["algoritma"], draft["nama"].strip()
+    tabel = "model_klasifikasi" if algoritma == RF else "model_prediksi"
+    if not nama or len(nama) > 100:
+        raise ServiceError("Nama model wajib diisi, maksimal 100 karakter.")
+    if db.fetch_one(f"SELECT 1 FROM {tabel} WHERE lower(nama) = lower(%s)", (nama,)):
+        raise ServiceError("Nama model sudah dipakai.")
+
+    hasil = jobs.selesai(draft["job_id"])["hasil"]
+    m = hasil["evaluasi"]["metrik"]
+    if algoritma == RF:
+        rel_model, rel_config = _simpan_berkas_model(draft["job_id"], "model.pkl",
+                                                     f"rf_{_slug(nama)}_{date.today():%Y%m%d}", hasil["config"])
+        row = db.fetch_one(
+            "INSERT INTO model_klasifikasi (nama, kecamatan_id, path_model, path_config, akurasi, presisi, recall, "
+            "f1, evaluasi, hyperparameter, tanggal_citra, dibuat_oleh) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (nama, hasil["kecamatan_id"], rel_model, rel_config, m["accuracy"], m["precision"], m["recall"],
+             m["f1"], db.json(hasil["evaluasi"]), db.json(hasil["params"]),
+             [date.fromisoformat(t) for t in hasil["tanggal_citra"]], user["nama"]),
+        )
+    else:
+        rel_model, rel_config = _simpan_berkas_model(draft["job_id"], "model.keras",
+                                                     f"convlstm_{_slug(nama)}_{date.today():%Y%m%d}", hasil["config"])
+        row = db.fetch_one(
+            "INSERT INTO model_prediksi (nama, kecamatan_ids, path_model, path_config, akurasi, presisi, recall, "
+            "f1, evaluasi, hyperparameter, dibuat_oleh) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+            "RETURNING id",
+            (nama, hasil["kecamatan_ids"], rel_model, rel_config, m["accuracy"], m["precision"], m["recall"],
+             m["f1"], db.json(hasil["evaluasi"]), db.json(hasil["params"]), user["nama"]),
+        )
+    jobs.hapus(draft["job_id"])
+    _daftar.clear()  # biar model baru langsung muncul di dropdown
+    return get(algoritma, row["id"])
 
 
 def discard(draft: dict) -> None:
     """Buang calon model beserta berkas sementaranya"""
     if draft.get("job_id"):
-        try:
-            backend.panggil(operasi.buang_job, draft["job_id"])
-        except ServiceError:
-            pass  
+        jobs.hapus(draft["job_id"])

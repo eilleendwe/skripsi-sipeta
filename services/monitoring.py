@@ -3,11 +3,13 @@ Pemantauan: membandingkan hasil klasifikasi tersimpan antar tanggal.
 Membaca hasil dari klasifkasi citra `services.classify.save'.
 """
 
-import base64
 from datetime import date
 
-from core import operasi
-from services import backend, regions
+import numpy as np
+
+from core import citra, db, storage
+from core.config import LABEL_NODATA
+from services import classify, regions
 from services.errors import ServiceError
 
 LEGENDA_KELAS = [
@@ -23,9 +25,16 @@ LEGENDA_PERUBAHAN = [
 
 
 def _results(kecamatan_id: str | None = None, model_id: int | None = None) -> list[dict]:
-    rows = backend.panggil(operasi.daftar_hasil, kecamatan_id, model_id)
+    rows = db.fetch_all(
+        "SELECT h.id, h.model_id, m.nama AS model_nama, h.kecamatan_id, h.tanggal, h.luas_terbangun, "
+        "h.luas_nonterbangun, h.persen_awan, h.persen_pchip, h.persen_backward, h.persen_forward, "
+        "h.persen_tidak_terisi, h.disimpan_oleh, h.disimpan_pada "
+        "FROM hasil_klasifikasi h JOIN model_klasifikasi m ON m.id = h.model_id "
+        "WHERE (%(kec)s::text IS NULL OR h.kecamatan_id = %(kec)s) "
+        "AND (%(model)s::int IS NULL OR h.model_id = %(model)s) ORDER BY h.tanggal",
+        {"kec": kecamatan_id, "model": model_id},
+    )
     for r in rows:
-        r["tanggal"] = date.fromisoformat(r["tanggal"])
         r["persen_terisi"] = round((r["persen_pchip"] or 0) + (r["persen_backward"] or 0)
                                    + (r["persen_forward"] or 0), 2)
     return rows
@@ -100,19 +109,33 @@ def maps(ringkasan: dict) -> dict:
     Citra asli, citra setelah PCHIP, dan peta klasifikasi kedua tanggal (PNG), peta perubahan, dan luas
     perubahannya. Citra bernilai None kalau berkasnya tidak tersimpan (citra PCHIP belum ada di hasil lama).
     """
-    data = backend.panggil(operasi.bandingkan, ringkasan["hasil_awal"], ringkasan["hasil_akhir"])
+    a, b = (db.fetch_one("SELECT * FROM hasil_klasifikasi WHERE id = %s", (i,))
+            for i in (ringkasan["hasil_awal"], ringkasan["hasil_akhir"]))
+    path_a, path_b = storage.ambil(a["path_raster"]), storage.ambil(b["path_raster"])
+    peta_a, peta_b = citra.baca(path_a), citra.baca(path_b)
+    if peta_a.shape != peta_b.shape:
+        raise ServiceError("Ukuran raster kedua tanggal berbeda, jadi tidak bisa dibandingkan per piksel.")
+    res = citra.profil(path_a)["res"]
+    km2 = res[0] * res[1] / 1e6
+    valid = (peta_a != LABEL_NODATA) & (peta_b != LABEL_NODATA)
 
-    def png(kunci):
-        return base64.b64decode(data[kunci]) if data.get(kunci) else None
+    def asli(row) -> bytes | None:
+        return citra.png_dari_folder_citra(storage.ambil_folder(row["path_citra"])) if row["path_citra"] else None
+
+    def pchip(row) -> bytes | None:
+        try:
+            return storage.ambil(classify.path_pchip(row["path_raster"])).read_bytes()
+        except FileNotFoundError:  # hasil yang disimpan sebelum citra PCHIP ikut disimpan
+            return None
 
     return {
-        "awal_asli": png("awal_asli_png"),
-        "akhir_asli": png("akhir_asli_png"),
-        "awal_pchip": png("awal_pchip_png"),
-        "akhir_pchip": png("akhir_pchip_png"),
-        "awal": png("awal_png"),
-        "akhir": png("akhir_png"),
-        "perubahan": png("perubahan_png"),
-        "bertambah": data["bertambah"],
-        "berkurang": data["berkurang"],
+        "awal_asli": asli(a),
+        "akhir_asli": asli(b),
+        "awal_pchip": pchip(a),
+        "akhir_pchip": pchip(b),
+        "awal": citra.png_klasifikasi(peta_a),
+        "akhir": citra.png_klasifikasi(peta_b),
+        "perubahan": citra.png_perubahan(peta_a, peta_b),
+        "bertambah": round(float(np.sum(valid & (peta_a == 0) & (peta_b == 1))) * km2, 4),
+        "berkurang": round(float(np.sum(valid & (peta_a == 1) & (peta_b == 0))) * km2, 4),
     }
