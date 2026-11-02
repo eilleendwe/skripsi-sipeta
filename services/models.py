@@ -8,6 +8,8 @@ import re
 from datetime import date, datetime
 from pathlib import PurePosixPath
 
+import streamlit as st
+
 from core import operasi
 from services import arsip, auth, backend, regions, roles
 from services.errors import ServiceError
@@ -114,7 +116,12 @@ def list_models(algoritma: str, kecamatan_id: str | None = None) -> list[dict]:
     """
     Model tersimpan, terbaru dulu. Kalau `kecamatan_id` diisi, cuma model yang mencakup kecamatan itu.
     """
-    return [_dari_baris(algoritma, r) for r in backend.panggil(_DAFTAR[algoritma], kecamatan_id)]
+    return [_dari_baris(algoritma, r) for r in _daftar(algoritma, kecamatan_id)]
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _daftar(algoritma: str, kecamatan_id: str | None) -> list[dict]:
+    return backend.panggil(_DAFTAR[algoritma], kecamatan_id)
 
 
 def get(algoritma: str, model_id: int | None) -> dict | None:
@@ -329,6 +336,7 @@ def save(draft: dict) -> dict:
     """Simpan calon model hasil `train`"""
     user = _require_admin()
     row = backend.panggil(_SIMPAN[draft["algoritma"]], draft["job_id"], draft["nama"], user["nama"])
+    _daftar.clear()  
     return _dari_baris(draft["algoritma"], row)
 
 
@@ -338,4 +346,4 @@ def discard(draft: dict) -> None:
         try:
             backend.panggil(operasi.buang_job, draft["job_id"])
         except ServiceError:
-            pass  # app mungkin sudah restart, jadi tidak ada yang perlu dibuang
+            pass  

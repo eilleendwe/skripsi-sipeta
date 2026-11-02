@@ -6,11 +6,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Salin env dulu, karena membaca st.secrets bisa menimpa os.environ.
 _ENV = dict(os.environ)
 
-# secrets.toml dibaca langsung dari folder proyek, supaya tetap kebaca walau perintah
-# dijalankan dari folder lain (st.secrets hanya mencari di folder kerja).
+# baca secrets
 try:
     _SECRETS = tomllib.loads((ROOT / ".streamlit" / "secrets.toml").read_text(encoding="utf-8"))
 except (OSError, tomllib.TOMLDecodeError):
@@ -46,7 +44,7 @@ def tujuan_db(url: str) -> str:
 
 def periksa_db_url() -> None:
     """
-    Cek SIPETA_DB bisa dibaca. Dipanggil saat app start, supaya salah tempel langsung ketahuan.
+    Cek SIPETA_DB bisa dibaca.
     """
     if not DB_URL:
         raise RuntimeError(
@@ -58,15 +56,15 @@ def periksa_db_url() -> None:
         conninfo_to_dict(DB_URL)
     except Exception as e:
         raise RuntimeError(
-            "Pengaturan SIPETA_DB tidak valid. Biasanya alamatnya terpotong ke baris baru atau ada spasi "
-            f"waktu ditempel. Tulis ulang dalam satu baris tanpa spasi. Detail: {e}") from None
+            "Pengaturan SIPETA_DB tidak valid. "
+            f" Detail: {e}") from None
 
 
 DB_URL = _pengaturan("SIPETA_DB")
 STORAGE = Path(_pengaturan("SIPETA_STORAGE", str(ROOT / "storage")))
 
-# "lokal" = berkas cuma di folder STORAGE. "s3" = berkas disimpan di bucket (Backblaze B2, dll.)
-# dan folder STORAGE jadi cache.
+# "lokal" = berkas cuma di folder STORAGE. 
+# "s3" = berkas disimpan di bucket
 STORAGE_MODE = _pengaturan("SIPETA_STORAGE_MODE", "lokal")
 S3_ENDPOINT = (_pengaturan("SIPETA_S3_ENDPOINT") or "").strip().rstrip("/") or None
 if S3_ENDPOINT and "://" not in S3_ENDPOINT:  # endpoint sering disalin tanpa https://
