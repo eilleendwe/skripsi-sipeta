@@ -41,7 +41,7 @@ def _laporan_folder(laporan: dict, kecamatan_id: str | None) -> None:
     st.dataframe(
         pd.DataFrame([
             {"Tanggal": b["tanggal"], "Band": b["band"],
-             "Status": "✅ valid" if b["status"] == "valid" else "❌ gagal"}
+             "Status": "✓ valid" if b["status"] == "valid" else "✗ gagal"}
             for b in laporan["baris"]
         ]),
         hide_index=True, width="stretch", height=min(36 * len(laporan["baris"]) + 40, 260),
@@ -148,13 +148,18 @@ def _evaluasi(calon: dict) -> None:
         st.caption("Metrik mengukur kesesuaian dengan label acuan berbasis NDBI pada blok uji di kecamatan yang sama.")
 
 
+@st.fragment
+def _isian(errors: dict, nonaktif: bool) -> tuple[dict, dict]:
+    identitas = _identitas(errors, nonaktif)
+    return identitas, _hyperparameter(errors, nonaktif, identitas.pop("jumlah_tanggal"))
+
+
 layout.page_header("Klasifikasi")
 with layout.card("klasifikasi", group="klasifikasi", role=user["role"]):
     berjalan, errors = latih.status(P)
     latih.general_error(errors)
 
-    identitas = _identitas(errors, berjalan)
-    params = _hyperparameter(errors, berjalan, identitas.pop("jumlah_tanggal"))
+    identitas, params = _isian(errors, berjalan)
 
     latih.start_button(P, berjalan)
     latih.run_if_started(P, models.RF, {**identitas, "params": params})

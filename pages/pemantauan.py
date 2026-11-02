@@ -16,6 +16,7 @@ def _link_klasifikasi() -> None:
     st.page_link(nav.path("klasifikasi_citra"), label="Buka Klasifikasi citra", icon=":material/satellite_alt:")
 
 
+@st.fragment
 def _form() -> dict:
     c_wil, c_kec, c_model, c_awal, c_akhir = st.columns([1.15, 1, 1.3, 1, 1])
     _, kecamatan_id = forms.region_select(c_wil, c_kec, P)

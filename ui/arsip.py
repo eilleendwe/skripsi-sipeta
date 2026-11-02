@@ -15,14 +15,14 @@ peta_klasifikasi/                   <- boleh folder ini, satu folder wilayah, at
 ├── kota_tangerang/
 │   ├── batuceper/                  <- nama folder = id atau nama kecamatan
 │   │   ├── 2016-10-07/
-│   │   │   └── peta.tif            <- nama bebas, satu .tif per folder tanggal
+│   │   │   └── peta.tif            <- satu file .tif per folder tanggal
 │   │   ├── 2017-07-04/
 │   │   └── ...
 │   └── ...
 └── klasifikasi_benda_2016-10-07.tif   <- hasil unduhan Klasifikasi Citra, boleh di folder mana saja
 
 Nilai piksel: 0 = nonterbangun, 1 = terbangun, 255 = NoData."""
-_VERSI = "_arsip_versi"  # dinaikkan setelah unggah supaya kotak unggah kosong lagi
+_VERSI = "_arsip_versi"
 _ERRORS = "_arsip_errors"
 
 
@@ -35,7 +35,7 @@ def _status(tahun: list[int]) -> str:
         return "belum ada"
     kurang = [t for t in arsip.TAHUN_DATA if t not in tahun]
     if not kurang:
-        return "✅ lengkap"
+        return "✓ lengkap"
     if len(kurang) <= 3:
         return "⚠️ tanpa " + ", ".join(map(str, kurang))
     return f"⚠️ {len(arsip.TAHUN_DATA) - len(kurang)} dari {len(arsip.TAHUN_DATA)} tahun"

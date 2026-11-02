@@ -18,6 +18,7 @@ def _isi_tanggal_dari_berkas() -> None:
         st.session_state[f"{P}_tanggal_citra"] = tanggal
 
 
+@st.fragment
 def _form() -> dict:
     c_model, c_wil, c_kec, c_tgl = st.columns([1.5, 1, 1, 1])
     _, kecamatan_id = forms.region_select(c_wil, c_kec, P)

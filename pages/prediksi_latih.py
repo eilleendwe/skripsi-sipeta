@@ -192,13 +192,17 @@ def _evaluasi(calon: dict) -> None:
     )
 
 
+@st.fragment
+def _isian(errors: dict, nonaktif: bool) -> tuple[dict, dict]:
+    return _identitas(errors, nonaktif), _hyperparameter(errors, nonaktif)
+
+
 layout.page_header("Prediksi")
 with layout.card("prediksi", group="prediksi", role=user["role"]):
     berjalan, errors = latih.status(P)
     latih.general_error(errors)
 
-    identitas = _identitas(errors, berjalan)
-    params = _hyperparameter(errors, berjalan)
+    identitas, params = _isian(errors, berjalan)
 
     latih.start_button(P, berjalan)
     latih.run_if_started(P, models.CONVLSTM, {**identitas, "params": params})
