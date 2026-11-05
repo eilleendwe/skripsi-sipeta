@@ -21,8 +21,13 @@ from pathlib import Path
 
 from core.config import (S3_BUCKET, S3_ENDPOINT, S3_KEY, S3_REGION, S3_SECRET, STORAGE,
                          STORAGE_MODE)
+from core.jobs import ProsesError
 
 S3 = STORAGE_MODE == "s3"
+
+
+class BerkasTidakAda(ProsesError, FileNotFoundError):
+    """Berkas tidak ada di bucket. Halaman menampilkannya sebagai error biasa, bukan crash."""
 
 
 def periksa() -> None:
@@ -68,21 +73,33 @@ def _objek(prefix: str) -> list[tuple[str, int]]:
 
 
 def _unduh(kunci: str, tujuan: Path) -> None:
+    from botocore.exceptions import ClientError
     # Tulis ke nama sementara dulu, supaya thread lain tidak membaca berkas yang belum selesai.
     tujuan.parent.mkdir(parents=True, exist_ok=True)
     sementara = tujuan.with_name(f".{tujuan.name}.{uuid.uuid4().hex[:8]}")
-    _klien().download_file(S3_BUCKET, kunci, str(sementara))
+    try:
+        # get_object cukup 1 transaksi, download_file bisa 2 atau lebih per berkas.
+        isi = _klien().get_object(Bucket=S3_BUCKET, Key=kunci)["Body"]
+        with open(sementara, "wb") as f:
+            shutil.copyfileobj(isi, f, 1024 * 1024)
+    except ClientError as e:
+        sementara.unlink(missing_ok=True)
+        status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+        if status == 404:
+            raise BerkasTidakAda(f"Berkas {kunci} tidak ada di storage.") from None
+        if status == 403:
+            raise ProsesError("Akses ke storage ditolak.") from None
+        raise ProsesError(f"Storage tidak dapat diakses ({e.response.get('Error', {}).get('Code')}).") from None
+    except BaseException:
+        sementara.unlink(missing_ok=True)
+        raise
     os.replace(sementara, tujuan)
 
 
 def ambil(rel: str) -> Path:
     path = lokal(rel)
     if S3 and not path.exists():
-        from botocore.exceptions import ClientError
-        try:
-            _unduh(rel, path)
-        except ClientError as e:
-            raise FileNotFoundError(f"Berkas {rel} tidak ada di storage.") from e
+        _unduh(rel, path)
     return path
 
 
