@@ -10,9 +10,9 @@ from scipy.ndimage import distance_transform_edt
 
 PROCESS_VERSION = "pchip_manual_cloudbuffer30m_v2"
 
-# SCL: 3 = cloud shadow, 8 = cloud medium prob., 9 = cloud high prob., 10 = thin cirrus
+# Kelas SCL yang dianggap awan: 3 = bayangan awan, 8 = awan sedang, 9 = awan tebal, 10 = cirrus tipis
 CLOUD_RELATED_SCL = [3, 8, 9, 10]
-CLOUD_BUFFER_METERS = 30.0
+CLOUD_BUFFER_METERS = 30.0  # awan dilebarkan 30 m
 ANCHOR_CLOUD_MAX = 6.0  # batas % awan (sesudah buffer) supaya tanggal jadi anchor
 
 
@@ -28,10 +28,10 @@ def cloud_mask(scl, res_x, res_y, cloud_classes=CLOUD_RELATED_SCL, buffer_m=CLOU
     """
     Return (awan, valid). awan = piksel berawan setelah buffer, valid = SCL bukan 0 (NoData).
     """
-    valid = scl != 0
+    valid = scl != 0  # SCL 0 = di luar wilayah
     base_cloud = np.isin(scl, cloud_classes) & valid
     if np.any(base_cloud):
-        # jarak (meter) setiap piksel ke piksel awan terdekat
+        # jarak (meter) tiap piksel ke piksel awan terdekat; <= 30 m ikut jadi awan
         distance_m = distance_transform_edt(~base_cloud, sampling=(res_y, res_x))
         awan = (distance_m <= buffer_m) & valid
     else:
@@ -41,7 +41,7 @@ def cloud_mask(scl, res_x, res_y, cloud_classes=CLOUD_RELATED_SCL, buffer_m=CLOU
 
 def buffer_halo(res_x, res_y, buffer_m=CLOUD_BUFFER_METERS):
     """Jumlah piksel tambahan"""
-    return int(np.ceil(buffer_m / min(res_x, res_y)))
+    return int(np.ceil(buffer_m / min(res_x, res_y)))  # 30 m / 10 m = 3 piksel
 
 
 # ============================================================
@@ -49,8 +49,8 @@ def buffer_halo(res_x, res_y, buffer_m=CLOUD_BUFFER_METERS):
 # ============================================================
 def pchip_internal_slope(h_prev, h_next, d_prev, d_next):
     """
-    Turunan di titik interior: rata-rata harmonik berbobot dari dua secant.
-    Bernilai 0 jika secant berlawanan tanda atau salah satunya nol
+    Turunan di anchor tengah: rata-rata harmonik berbobot dari dua kemiringan.
+    Kalau arahnya beda atau salah satunya 0, turunannya 0 supaya kurva tidak overshoot.
     """
     slope = np.zeros_like(d_prev, dtype=np.float64)
     same_direction = (d_prev != 0) & (d_next != 0) & (np.sign(d_prev) == np.sign(d_next))
@@ -63,7 +63,7 @@ def pchip_internal_slope(h_prev, h_next, d_prev, d_next):
 
 
 def pchip_edge_slope(h0, h1, d0, d1):
-    """Turunan di titik ujung: formula tiga titik satu sisi"""
+    """Turunan di anchor ujung: pakai 3 titik di satu sisi, lalu dibatasi"""
     slope = ((2.0 * h0 + h1) * d0 - h0 * d1) / (h0 + h1)
     wrong_direction = np.sign(slope) != np.sign(d0)
     limited = (~wrong_direction) & (np.sign(d0) != np.sign(d1)) & (np.abs(slope) > 3.0 * np.abs(d0))
@@ -74,13 +74,12 @@ def pchip_edge_slope(h0, h1, d0, d1):
 
 def pchip_manual_from_anchors(anchor_times, anchor_values, anchor_valid, target_time):
     """
-    Isi nilai pada `target_time` untuk banyak piksel sekaligus (vektorisasi).
+    Isi nilai di `target_time` untuk banyak piksel sekaligus.
 
-    anchor_times  : (n_anchor,)          waktu anchor (ordinal hari)
+    anchor_times  : (n_anchor,)          tanggal anchor (ordinal hari)
     anchor_values : (n_anchor, n_pixel)  nilai reflektansi anchor
-    anchor_valid  : (n_anchor, n_pixel)  True jika anchor valid (tidak berawan) pada piksel tsb.
-    Return        : output (n_pixel,), method (n_pixel,)
-                    method: 0 = tidak terisi, 1 = PCHIP, 2 = backward fill, 3 = forward fill
+    anchor_valid  : (n_anchor, n_pixel)  True kalau anchor itu cerah di piksel tsb.
+    Hasil: output (n_pixel,) dan method (n_pixel,), isinya kode metode 0/1/2/3 seperti di awal file.
     """
     x = np.asarray(anchor_times, dtype=np.float64)
     y = np.asarray(anchor_values, dtype=np.float64)
@@ -90,7 +89,8 @@ def pchip_manual_from_anchors(anchor_times, anchor_values, anchor_valid, target_
     method = np.zeros(n_pixel, dtype=np.uint8)
     anchor_index = np.arange(n_anchor, dtype=np.int32)[:, None]
 
-    # --- 2 anchor valid terdekat sebelum (j0 < j1) dan sesudah (j2 < j3) target, per piksel ---
+    # Cari per piksel: 2 anchor cerah terdekat sebelum target (j0 < j1) dan sesudah target (j2 < j3).
+    # Kalau tidak ada, j0/j1 = -1 dan j2/j3 = n_anchor.
     before_mask = valid & (x[:, None] < target_time)
     after_mask = valid & (x[:, None] > target_time)
     j1 = np.where(before_mask, anchor_index, -1).max(axis=0)
@@ -99,21 +99,21 @@ def pchip_manual_from_anchors(anchor_times, anchor_values, anchor_valid, target_
     j3 = np.where(after_mask & (anchor_index > j2[None, :]), anchor_index, n_anchor).min(axis=0)
     has_before, has_after = j1 >= 0, j2 < n_anchor
 
-    # --- Hanya ada anchor sesudah -> backward fill (nilai anchor sesudah terdekat) ---
+    # Cuma ada anchor sesudah -> backward fill (salin nilai anchor sesudah terdekat)
     only_after = (~has_before) & has_after
     if np.any(only_after):
         cols = np.where(only_after)[0]
         output[cols] = y[j2[cols], cols]
         method[cols] = 2
 
-    # --- Hanya ada anchor sebelum -> forward fill (nilai anchor sebelum terdekat) ---
+    # Cuma ada anchor sebelum -> forward fill (salin nilai anchor sebelum terdekat)
     only_before = has_before & (~has_after)
     if np.any(only_before):
         cols = np.where(only_before)[0]
         output[cols] = y[j1[cols], cols]
         method[cols] = 3
 
-    # --- Ada anchor sebelum & sesudah -> PCHIP ---
+    # Ada anchor sebelum dan sesudah -> PCHIP
     cols = np.where(has_before & has_after)[0]
     if len(cols) == 0:
         return output, method
@@ -123,43 +123,43 @@ def pchip_manual_from_anchors(anchor_times, anchor_values, anchor_valid, target_
     y1, y2 = y[k1, cols], y[k2, cols]
     h = x2 - x1
     d = (y2 - y1) / h
-    m1, m2 = d.copy(), d.copy()
+    m1, m2 = d.copy(), d.copy()  # bawaan kalau cuma 2 anchor: garis lurus
     has0, has3 = k0 >= 0, k3 < n_anchor
 
     def secant(a, b, c):
-        """Jarak waktu dan kemiringan antara anchor a -> b pada kolom piksel c"""
+        """Jarak waktu (h) dan kemiringan (delta) dari anchor a ke anchor b, di piksel c"""
         hab = x[b] - x[a]
         return hab, (y[b, c] - y[a, c]) / hab
 
-    # Turunan m1 di anchor sebelum (x1)
-    use = has0  # interior: x0, x1, x2
+    # Turunan m1 di x1
+    use = has0  # x1 anchor tengah (ada x0)
     if np.any(use):
         c = cols[use]
         h_prev, d_prev = secant(k0[use], k1[use], c)
         h_next, d_next = secant(k1[use], k2[use], c)
         m1[use] = pchip_internal_slope(h_prev, h_next, d_prev, d_next)
-    use = (~has0) & has3  # endpoint kiri: x1, x2, x3
+    use = (~has0) & has3  # x1 anchor ujung kiri, pakai x1, x2, x3
     if np.any(use):
         c = cols[use]
         h0, d0 = secant(k1[use], k2[use], c)
         h1, d1 = secant(k2[use], k3[use], c)
         m1[use] = pchip_edge_slope(h0, h1, d0, d1)
 
-    # Turunan m2 di anchor sesudah (x2)
-    use = has3  # interior: x1, x2, x3
+    # Turunan m2 di x2
+    use = has3  # x2 anchor tengah (ada x3)
     if np.any(use):
         c = cols[use]
         h_prev, d_prev = secant(k1[use], k2[use], c)
         h_next, d_next = secant(k2[use], k3[use], c)
         m2[use] = pchip_internal_slope(h_prev, h_next, d_prev, d_next)
-    use = (~has3) & has0  # endpoint kanan: x2, x1, x0 (arah terbalik)
+    use = (~has3) & has0  # x2 anchor ujung kanan, pakai x2, x1, x0 (arah dibalik)
     if np.any(use):
         c = cols[use]
         h0, d0 = secant(k1[use], k2[use], c)
         h1, d1 = secant(k0[use], k1[use], c)
         m2[use] = pchip_edge_slope(h0, h1, d0, d1)
 
-    # Basis cubic Hermite pada interval [x1, x2]
+    # Nilai di tanggal target
     s = (target_time - x1) / h
     h00 = 2 * s**3 - 3 * s**2 + 1
     h10 = s**3 - 2 * s**2 + s
@@ -171,7 +171,7 @@ def pchip_manual_from_anchors(anchor_times, anchor_values, anchor_valid, target_
 
 
 def cast_values_to_dtype(values, dtype):
-    """Bulatkan & clip hasil float ke dtype raster asli"""
+    """Hasil PCHIP berupa float; bulatkan dan potong ke rentang tipe data asli"""
     dtype = np.dtype(dtype)
     if np.issubdtype(dtype, np.integer):
         info = np.iinfo(dtype)
