@@ -80,8 +80,6 @@ def _hasil(hasil: dict) -> None:
         layout.facts([
             ("Bertambah", fmt.km2(hasil["bertambah"])),
             ("Berkurang", fmt.km2(hasil["berkurang"])),
-            ("Luas versi 64×64", f"{acuan}: {fmt.km2(hasil['luas_acuan_64'])} · "
-                                 f"{tahun}: {fmt.km2(hasil['luas_terbangun_64'])}"),
         ])
 
 
