@@ -192,6 +192,7 @@ class RandomForest:
         hasil = (n_satu > n_nol).astype(np.int64)
         seri = n_satu == n_nol
         hasil[seri] = predictions[0, seri]
+        print(hasil[:100])
         return hasil
 
 

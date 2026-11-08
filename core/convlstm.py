@@ -21,11 +21,8 @@ BATCH_PREDIKSI = 8
 @tf.keras.utils.register_keras_serializable(package="sipeta")
 class ConvLSTMManual(layers.Layer):
     """
-    Layer ConvLSTM dengan rumus manual (rumus 2.39–2.44 di skripsi).
-
     Konvolusinya pakai tf.nn.conv2d padding same, jadi peta tetap 64x64. H dan C mulai dari nol dan
-    bobotnya dipakai bareng untuk semua tahun. Nilai awal bobot dan dropout-nya disamain dengan
-    ConvLSTM2D bawaan Keras.
+    bobotnya dipakai bareng untuk semua tahun. 
     """
 
     GATES = ("i", "f", "c", "o")    # input gate, forget gate, kandidat cell state, output gate
@@ -37,13 +34,12 @@ class ConvLSTMManual(layers.Layer):
         self.return_sequences = bool(return_sequences)
         self.dropout = float(dropout)
 
-    def get_config(self):           # supaya model .keras bisa disimpan dan dimuat ulang
+    def get_config(self):           
         return {**super().get_config(), "filters": self.filters, "kernel_size": self.kernel_size,
                 "return_sequences": self.return_sequences, "dropout": self.dropout}
 
     def build(self, input_shape):   # input_shape = (batch, waktu, tinggi, lebar, kanal)
         k, f, c_in = self.kernel_size, self.filters, int(input_shape[-1])
-        # Nilai awal 4 gate dibuat sekaligus lalu dipotong per gate, supaya sebarannya sama dengan ConvLSTM2D.
         W_x_awal = tf.keras.initializers.GlorotUniform()((k, k, c_in, 4 * f))
         W_h_awal = tf.keras.initializers.Orthogonal()((k, k, f, 4 * f))
         self.W_x, self.W_h, self.b = {}, {}, {}
@@ -213,6 +209,7 @@ def forecast_recursive(model, window, n_steps, threshold=THRESHOLD):
         prob = model.predict(window, batch_size=BATCH_PREDIKSI, verbose=0)[..., 0]   # (K,H,W)
         binary = (prob > threshold).astype(np.float32)
         binary[nodata] = -1.0
+        print(binary.flatten()[:100])
         probs.append(prob)
         bins.append(binary)
         window = np.concatenate([window[:, 1:], binary[:, np.newaxis, :, :, np.newaxis]], axis=1)

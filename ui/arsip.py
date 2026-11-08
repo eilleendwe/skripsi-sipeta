@@ -22,8 +22,6 @@ peta_klasifikasi/                   <- boleh folder ini, satu folder wilayah, at
 └── klasifikasi_benda_2016-10-07.tif   <- hasil unduhan Klasifikasi Citra, boleh di folder mana saja
 
 Nilai piksel: 0 = nonterbangun, 1 = terbangun, 255 = NoData."""
-_VERSI = "_arsip_versi"
-_ERRORS = "_arsip_errors"
 
 
 def _rentang(tahun: list[int]) -> str:
@@ -66,14 +64,12 @@ def laporan_folder(berkas: list, tersedia: dict | None = None) -> dict:
     return laporan
 
 
-def panel(nonaktif: bool) -> None:
+def panel(nonaktif: bool = False) -> None:
     try:
-        tersedia = arsip.tahun_tersedia()
+        arsip.tahun_tersedia()
     except ServiceError as e:
         st.error(e.message, icon=":material/cloud_off:")
         st.stop()
-    for kecamatan, pesan in st.session_state.pop(_ERRORS, {}).items():
-        st.warning(f"Arsip {kecamatan} tidak diunggah: {pesan}", icon=":material/warning:")
 
     semua = regions.list_kecamatan()
     n_lengkap = len(arsip.lengkap([k["id"] for k in semua]))
@@ -84,36 +80,3 @@ def panel(nonaktif: bool) -> None:
                         f"{len(regions.list_kecamatan(w['id']))} kecamatan lengkap")
             for w in regions.list_wilayah()
         ])
-        st.caption("Arsip dipakai opsi latih “Arsip di server” dan selalu menjadi masukan Prediksi Citra. "
-                   "Unggah folder di sini untuk menyimpannya di server; tanggal yang sudah ada diganti, tanggal lain "
-                   "tetap. Peta tahunan dibuat ulang otomatis setelah arsip berubah.")
-        st.code(STRUKTUR, language=None)
-
-        versi = st.session_state.get(_VERSI, 0)
-        berkas = st.file_uploader(
-            "Folder arsip klasifikasi", type=["tif", "tiff"], accept_multiple_files="directory",
-            key=f"arsip_folder_{versi}", disabled=nonaktif,
-            help="Kecamatan dikenali dari nama folder di atas folder tanggal, atau dari nama berkas hasil unduhan "
-                 "Klasifikasi Citra.",
-        ) or []
-        if not berkas:
-            return
-
-        laporan = laporan_folder(berkas, tersedia)
-
-        if st.button(f"Unggah {len(laporan['baris'])} kecamatan ke server", type="primary", icon=":material/upload:",
-                     key="arsip_unggah", disabled=nonaktif or not laporan["baris"]):
-            bar = st.progress(0.0, text="Menyiapkan…")
-            try:
-                for event in arsip.unggah(laporan, berkas):
-                    bar.progress(event["progress"], text=event["label"])
-                    errors = event["errors"]
-            except ServiceError as e:
-                bar.empty()
-                st.error(e.message, icon=":material/error:")
-                return
-            berhasil = len(laporan["baris"]) - len(errors)
-            st.session_state[_VERSI] = versi + 1
-            st.session_state[_ERRORS] = errors
-            layout.set_flash(f"Arsip {berhasil} kecamatan diunggah ke server.", ":material/check_circle:")
-            st.rerun()

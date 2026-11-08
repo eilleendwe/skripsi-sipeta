@@ -47,7 +47,7 @@ def mulai(job_id: str, fungsi, *args) -> None:
 def _jalankan(job_id, fungsi, args):
     update(job_id, 0.0, "Memulai…", status="berjalan")
     try:
-        hasil = fungsi(job_id, *args)
+        hasil = fungsi(job_id, *args)   # hasil = latih_prediksi.jalankan(job_id, folder, kecamatan, params)
     except ProsesError as e:
         _set(job_id, status="gagal", pesan=str(e))
     except Exception as e:  # error tak terduga: catat lengkap di log

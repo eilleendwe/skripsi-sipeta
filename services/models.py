@@ -308,7 +308,7 @@ def mulai_latih(algoritma: str, spec: dict, bar) -> str:
         jobs.mulai(job_id, latih.jalankan, folder, regions.get_kecamatan(spec["kecamatan_id"]), params)
         return job_id
 
-    from core import latih_prediksi  # memuat TensorFlow, jadi baru diimpor di sini
+    from core import latih_prediksi
     job_id = jobs.buat("latih_prediksi")
     folder = TMP_DIR / job_id
     folder.mkdir(parents=True)
@@ -328,6 +328,7 @@ def mulai_latih(algoritma: str, spec: dict, bar) -> str:
             raise
     else:
         kecamatan = [regions.get_kecamatan(k) for k in spec["kecamatan_ids"]]
+    # panggil fungsi core/latih_prediksi
     jobs.mulai(job_id, latih_prediksi.jalankan, folder, kecamatan, spec["params"])
     return job_id
 

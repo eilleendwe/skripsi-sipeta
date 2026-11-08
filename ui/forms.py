@@ -101,7 +101,10 @@ def model_select(container, prefix: str, algoritma: str, kecamatan_id: str | Non
     semua = luar_cakupan and st.session_state.get(k_semua, False)
     daftar = {m["id"]: m for m in models.list_models(algoritma, None if semua else kecamatan_id)}
     sebelumnya = st.session_state.get(k_model)
-    terbuang = models.get(algoritma, sebelumnya) if sebelumnya and sebelumnya not in daftar else None
+    # Kalau model lama tidak ada di daftar baru, Streamlit bisa mengembalikan teks labelnya, bukan id.
+    if not isinstance(sebelumnya, int):
+        sebelumnya = None
+    terbuang =models.get(algoritma, sebelumnya) if sebelumnya and sebelumnya not in daftar else None
 
     model_id = select(
         container, "Model", list(daftar), k_model,
