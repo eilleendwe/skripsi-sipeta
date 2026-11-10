@@ -94,22 +94,20 @@ def _hasil(hasil: dict) -> None:
             ("Tanggal", fmt.tanggal(hasil["tanggal"])),
             ("Model", hasil["model_nama"]),
         ])
+        total = hasil["luas_terbangun"] + hasil["luas_nonterbangun"]
         layout.metric_cards([
             ("Luas Lahan Terbangun", fmt.km2(hasil["luas_terbangun"])),
             ("Luas Lahan Nonterbangun", fmt.km2(hasil["luas_nonterbangun"])),
+            ("Persentase Terbangun", fmt.porsi(hasil["luas_terbangun"], total)),
+            ("Persentase Nonterbangun", fmt.porsi(hasil["luas_nonterbangun"], total)),
         ], min_width=180)
         layout.facts([
             ("Piksel berawan", fmt.persen(hasil["persen_awan"], 2)),
             ("Terisi PCHIP", fmt.persen(hasil["persen_pchip"], 2)),
             ("Terisi backward/forward fill",
              fmt.persen(hasil["persen_backward"] + hasil["persen_forward"], 2)),
-            ("Tidak terisi (NoData)", fmt.persen(hasil["persen_tidak_terisi"], 2)),
+            #("Tidak terisi (NoData)", fmt.persen(hasil["persen_tidak_terisi"], 2)),
         ])
-        if hasil["persen_terisi"] > classify.BATAS_TERISI:
-            st.warning(
-                f"Lebih dari {classify.BATAS_TERISI:.0f}% piksel tertutup awan dan diisi interpolasi. "
-                "Pertimbangkan tanggal lain.", icon=":material/cloud:",
-            )
         for pesan in hasil["peringatan"]:
             st.warning(pesan, icon=":material/cloud_off:")
         if hasil["di_luar_cakupan"]:

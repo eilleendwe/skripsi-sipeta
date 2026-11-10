@@ -25,6 +25,11 @@ def persen(nilai: float, desimal: int = 1) -> str:
     return f"{angka(nilai, desimal)}%"
 
 
+def porsi(bagian: float, total: float) -> str:
+    """Bagian dari total dalam persen, misal luas terbangun dari luas kecamatan"""
+    return persen(100 * bagian / total if total else 0.0, 2)
+
+
 def skor(nilai: float) -> str:
     """Metrik 0..1 dengan tiga desimal: '0,912'"""
     return angka(nilai, 3)

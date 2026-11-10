@@ -60,7 +60,7 @@ def _hasil(hasil: dict) -> None:
             ("Kecamatan", hasil["kecamatan_nama"]),
             ("Tahun", str(tahun)),
             ("Model", hasil["model_nama"]),
-            ("Masukan", masukan),
+            #("Masukan", masukan),
         ])
         if hasil["rekursif"]:
             st.info(f"Akurasi prediksi {tahun} cenderung lebih rendah daripada {acuan + 1} karena memakai hasil "
@@ -68,9 +68,12 @@ def _hasil(hasil: dict) -> None:
                     icon=":material/info:")
         hasil_ui.save_download("pc", hasil, predict, "Hasil prediksi disimpan.")
     with c_luas:
+        total = hasil["luas_terbangun"] + hasil["luas_nonterbangun"]
         layout.metric_cards([
             ("Luas Lahan Terbangun", fmt.km2(hasil["luas_terbangun"])),
             ("Luas Lahan Nonterbangun", fmt.km2(hasil["luas_nonterbangun"])),
+            ("Persentase Terbangun", fmt.porsi(hasil["luas_terbangun"], total)),
+            ("Persentase Nonterbangun", fmt.porsi(hasil["luas_nonterbangun"], total)),
         ], min_width=180)
         nada = "naik" if hasil["selisih"] > 0 else ("turun" if hasil["selisih"] < 0 else "tetap")
         st.html(

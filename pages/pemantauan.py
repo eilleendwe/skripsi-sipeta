@@ -50,9 +50,15 @@ def _form() -> dict:
 def _ringkasan(r: dict) -> None:
     st.caption(f"{r['kecamatan_nama']}, {r['wilayah_nama']} · model {r['model_nama']}")
     c_teks, c_delta = st.columns([1, 1.6], vertical_alignment="center")
+    total_awal = r["luas_awal"] + r["nonterbangun_awal"]
+    total_akhir = r["luas_akhir"] + r["nonterbangun_akhir"]
     layout.facts([
         (f"Luas awal ({fmt.tanggal(r['awal'])})", fmt.km2(r["luas_awal"])),
         (f"Luas akhir ({fmt.tanggal(r['akhir'])})", fmt.km2(r["luas_akhir"])),
+        ("Persentase awal", f"Terbangun {fmt.porsi(r['luas_awal'], total_awal)} · "
+                            f"Nonterbangun {fmt.porsi(r['nonterbangun_awal'], total_awal)}"),
+        ("Persentase akhir", f"Terbangun {fmt.porsi(r['luas_akhir'], total_akhir)} · "
+                             f"Nonterbangun {fmt.porsi(r['nonterbangun_akhir'], total_akhir)}"),
     ], container=c_teks)
     nada = "naik" if r["perubahan"] > 0 else ("turun" if r["perubahan"] < 0 else "tetap")
     tanda = "+" if r["perubahan_persen"] > 0 else ("−" if r["perubahan_persen"] < 0 else "")
@@ -130,7 +136,10 @@ def _riwayat(r: dict) -> None:
         pd.DataFrame([
             {"Tanggal": fmt.tanggal(h["tanggal"]), "Model": h["model_nama"],
              "Luas terbangun (km²)": fmt.angka(h["luas_terbangun"]),
-             "Luas nonterbangun (km²)": fmt.angka(h["luas_nonterbangun"])}
+             "Luas nonterbangun (km²)": fmt.angka(h["luas_nonterbangun"]),
+             "Terbangun (%)": fmt.porsi(h["luas_terbangun"], h["luas_terbangun"] + h["luas_nonterbangun"]),
+             "Nonterbangun (%)": fmt.porsi(h["luas_nonterbangun"],
+                                           h["luas_terbangun"] + h["luas_nonterbangun"])}
             for h in riwayat
         ]),
         hide_index=True, width="stretch",

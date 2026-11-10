@@ -99,6 +99,8 @@ def compare(model_id: int | None, kecamatan_id: str | None, awal: date | None, a
         "hasil_akhir": b["id"],
         "luas_awal": a["luas_terbangun"],
         "luas_akhir": b["luas_terbangun"],
+        "nonterbangun_awal": a["luas_nonterbangun"],
+        "nonterbangun_akhir": b["luas_nonterbangun"],
         "perubahan": perubahan,
         "perubahan_persen": round(100 * perubahan / a["luas_terbangun"], 1) if a["luas_terbangun"] else 0.0,
     }
