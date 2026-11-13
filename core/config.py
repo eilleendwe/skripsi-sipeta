@@ -79,7 +79,6 @@ MODEL_DIR = STORAGE / "model"        # model (.pkl / .keras) + konfigurasi (.jso
 HASIL_DIR = STORAGE / "hasil"        # GeoTIFF hasil klasifikasi yang disimpan
 CITRA_DIR = STORAGE / "citra"        # citra masukan dari hasil klasifikasi yang disimpan
 TMP_DIR = STORAGE / "tmp"            # unggahan dan hasil yang belum disimpan
-PREDIKSI_DIR = STORAGE / "prediksi"  # hasil prediksi yang disimpan (GeoTIFF 10 m + peta 64x64 .npz)
 
 # Masukan ConvLSTM: peta klasifikasi 0/1 per tanggal
 ARSIP_KLASIFIKASI_DIR = STORAGE / "arsip_klasifikasi"

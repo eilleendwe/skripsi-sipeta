@@ -100,22 +100,6 @@ CREATE TABLE model_prediksi (
 );
 CREATE UNIQUE INDEX model_prediksi_nama_unik ON model_prediksi (lower(nama));
 
-CREATE TABLE hasil_prediksi (
-    id                SERIAL      PRIMARY KEY,
-    model_id          INTEGER     NOT NULL REFERENCES model_prediksi (id) ON DELETE CASCADE,
-    kecamatan_id      VARCHAR(40) NOT NULL REFERENCES kecamatan (id),
-    tahun             SMALLINT    NOT NULL,
-    luas_terbangun    REAL        NOT NULL,  -- km², peta 10 m
-    luas_nonterbangun REAL        NOT NULL,  -- km², peta 10 m
-    luas_acuan        REAL,                  -- km², peta tahunan aktual terakhir (10 m)
-    luas_terbangun_64 REAL,                  -- km², peta model 64x64
-    path_raster       TEXT        NOT NULL,  -- GeoTIFF 10 m
-    path_peta         TEXT        NOT NULL,  -- .npz peluang + biner 64x64
-    disimpan_oleh     VARCHAR(100),
-    disimpan_pada     TIMESTAMP   NOT NULL DEFAULT now(),
-    UNIQUE (model_id, kecamatan_id, tahun)
-);
-
 -- Data wilayah dan kecamatan
 INSERT INTO wilayah (id, nama) VALUES
     ('kabupaten_tangerang',    'Kabupaten Tangerang'),

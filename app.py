@@ -3,7 +3,7 @@ import shutil
 import streamlit as st
 
 from core import storage
-from core.config import CITRA_DIR, HASIL_DIR, MODEL_DIR, PREDIKSI_DIR, TMP_DIR, periksa_db_url
+from core.config import CITRA_DIR, HASIL_DIR, MODEL_DIR, TMP_DIR, periksa_db_url
 from services import auth
 from services.errors import ServiceError
 from ui import layout, nav, sidebar
@@ -15,7 +15,7 @@ def _siapkan() -> None:
     periksa_db_url()
     storage.periksa()
     shutil.rmtree(TMP_DIR, ignore_errors=True)
-    for folder in (TMP_DIR, MODEL_DIR, HASIL_DIR, CITRA_DIR, PREDIKSI_DIR):
+    for folder in (TMP_DIR, MODEL_DIR, HASIL_DIR, CITRA_DIR):
         folder.mkdir(parents=True, exist_ok=True)
 
 

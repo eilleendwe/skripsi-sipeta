@@ -62,7 +62,7 @@ Arsip ini dipakai oleh opsi latih **Arsip di server** dan **selalu** menjadi mas
 3. Pilih **Tahun**: 2026 atau 2027. Tahun 2027 adalah prediksi rekursif (memakai hasil prediksi 2026 sebagai masukan), sehingga akurasinya lebih rendah.
 4. Tekan **Prediksi**. Tidak perlu mengunggah apa pun: masukannya peta tahunan beberapa tahun terakhir (sebanyak sequence length model, misalnya 2022–2025) dari arsip klasifikasi di server. Jika arsip kecamatan itu belum lengkap, muncul pesan.
 5. Hasil menampilkan peta aktual 2025 dan peta prediksi berdampingan (10 m), luas lahan terbangun dan nonterbangun, selisih terhadap 2025, luas yang bertambah dan berkurang, serta luas versi 64×64 sebagai pembanding. Aktifkan **Tampilkan perubahan** untuk melihat lokasi yang berubah. Detail halus peta berasal dari peta 2025; perubahan hasil prediksi berupa kotak seukuran satu sel model.
-6. Tekan **Simpan hasil** atau **Unduh** (PNG atau GeoTIFF).
+6. Tekan **Unduh** untuk mengambil PNG atau GeoTIFF. Hasil prediksi tidak disimpan di sistem.
 """
 
 _PENAMAAN = """

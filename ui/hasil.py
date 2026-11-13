@@ -10,8 +10,7 @@ _FORMAT = (("png", "PNG"), ("tif", "GeoTIFF"))
 
 def save_download(prefix: str, hasil: dict, service, pesan_tersimpan: str) -> None:
     """
-    Tombol Simpan hasil dan Unduh. `service` = services.classify atau services.predict
-    (punya `is_saved`, `save`, dan `export`).
+    Tombol Simpan hasil dan Unduh. `service` = services.classify (punya `is_saved`, `save`, dan `export`).
     """
     tersimpan = service.is_saved(hasil)
     with st.container(horizontal=True):
@@ -24,12 +23,17 @@ def save_download(prefix: str, hasil: dict, service, pesan_tersimpan: str) -> No
             else:
                 layout.set_flash(pesan_tersimpan, ":material/check_circle:")
                 st.rerun()
-        with st.popover("Unduh", icon=":material/download:"):
-            for kode, label in _FORMAT:
-                try:
-                    isi, nama, mime = service.export(hasil, kode)
-                except ServiceError as e:
-                    st.caption(f"{label}: {e.message}")
-                    continue
-                st.download_button(label, isi, file_name=nama, mime=mime, key=f"{prefix}_unduh_{kode}",
-                                   on_click="ignore", width="stretch")
+        download(prefix, hasil, service)
+
+
+def download(prefix: str, hasil: dict, service) -> None:
+    """Tombol Unduh saja (PNG / GeoTIFF). `service` cukup punya `export`"""
+    with st.popover("Unduh", icon=":material/download:"):
+        for kode, label in _FORMAT:
+            try:
+                isi, nama, mime = service.export(hasil, kode)
+            except ServiceError as e:
+                st.caption(f"{label}: {e.message}")
+                continue
+            st.download_button(label, isi, file_name=nama, mime=mime, key=f"{prefix}_unduh_{kode}",
+                               on_click="ignore", width="stretch")

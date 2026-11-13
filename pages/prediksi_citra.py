@@ -66,7 +66,7 @@ def _hasil(hasil: dict) -> None:
             st.info(f"Akurasi prediksi {tahun} cenderung lebih rendah daripada {acuan + 1} karena memakai hasil "
                     f"prediksi {acuan + 1} sebagai masukan, sehingga kesalahan pada {acuan + 1} ikut terbawa.",
                     icon=":material/info:")
-        hasil_ui.save_download("pc", hasil, predict, "Hasil prediksi disimpan.")
+        hasil_ui.download("pc", hasil, predict)
     with c_luas:
         total = hasil["luas_terbangun"] + hasil["luas_nonterbangun"]
         layout.metric_cards([
